@@ -19,9 +19,13 @@ class MPERunner(Runner):
         start = time.time()
         episodes = int(self.num_env_steps) // self.episode_length // self.n_rollout_threads
 
+        scores = []
+
         for episode in range(episodes):
             if self.use_linear_lr_decay:
                 self.trainer.policy.lr_decay(episode, episodes)
+            
+            score = 0
 
             for step in range(self.episode_length):
                 # Sample actions
@@ -35,12 +39,20 @@ class MPERunner(Runner):
                 # insert data into buffer
                 self.insert(data)
 
+                ####### Remove this comment if needed
+                #add value to the score because for aggregation score in a sum of the rewards
+                #score += rewards[0]
+            
+            
+            score = rewards[0]
+            print(score)
             # compute return and update network
             self.compute()
             train_infos = self.train()
             
             # post process
             total_num_steps = (episode + 1) * self.episode_length * self.n_rollout_threads
+            scores.append(score)
             
             # save model
             if (episode % self.save_interval == 0 or episode == episodes - 1):
@@ -69,7 +81,7 @@ class MPERunner(Runner):
                         agent_k = 'agent%i/individual_rewards' % agent_id
                         env_infos[agent_k] = idv_rews
 
-                train_infos["average_episode_rewards"] = np.mean(self.buffer.rewards) * self.episode_length
+                train_infos["average_episode_rewards"] = round(np.mean(scores[-10:]), 2)
                 print("average episode rewards is {}".format(train_infos["average_episode_rewards"]))
                 self.log_train(train_infos, total_num_steps)
                 self.log_env(env_infos, total_num_steps)
@@ -200,6 +212,8 @@ class MPERunner(Runner):
             masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
             
             episode_rewards = []
+
+            score = 0
             
             for step in range(self.episode_length):
                 calc_start = time.time()
@@ -227,6 +241,8 @@ class MPERunner(Runner):
                 # Obser reward and next obs
                 obs, rewards, dones, infos = envs.step(actions_env)
                 episode_rewards.append(rewards)
+                ############ Remove the comment if needed
+                score += rewards[0][0]
 
                 rnn_states[dones == True] = np.zeros(((dones == True).sum(), self.recurrent_N, self.hidden_size), dtype=np.float32)
                 masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
@@ -242,7 +258,10 @@ class MPERunner(Runner):
                 else:
                     envs.render('human')
 
+            # score = rewards[0][0]
+            
             print("average episode rewards is: " + str(np.mean(np.sum(np.array(episode_rewards), axis=0))))
+            print("score is:" + str(score))
 
         if self.all_args.save_gifs:
             imageio.mimsave(str(self.gif_dir) + '/render.gif', all_frames, duration=self.all_args.ifi)

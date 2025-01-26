@@ -38,6 +38,8 @@ def get_config():
             specify the name of environment
         --use_obs_instead_of_state
             [only for some env] by default False, will use global state; or else will use concatenated local obs.
+        --project_name <str>
+            specify the name of the project to create a different wandb project
     
     Replay Buffer parameters:
         --episode_length <int>
@@ -182,6 +184,7 @@ def get_config():
     parser.add_argument("--env_name", type=str, default='StarCraft2', help="specify the name of environment")
     parser.add_argument("--use_obs_instead_of_state", action='store_true',
                         default=False, help="Whether to use global state or concatenated obs")
+    parser.add_argument("--project_name", type=str, default='MAPPO', help="specify the name of your project")
 
     # replay buffer parameters
     parser.add_argument("--episode_length", type=int,

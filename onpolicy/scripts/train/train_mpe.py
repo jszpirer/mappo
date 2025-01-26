@@ -64,6 +64,7 @@ def parse_args(args, parser):
 def main(args):
     parser = get_config()
     all_args = parse_args(args, parser)
+    print(all_args)
 
     if all_args.algorithm_name == "rmappo":
         print("u are choosing to use rmappo, we set use_recurrent_policy to be True")
@@ -104,7 +105,7 @@ def main(args):
     # wandb
     if all_args.use_wandb:
         run = wandb.init(config=all_args,
-                         project=all_args.env_name,
+                         project=all_args.project_name,
                          entity=all_args.user_name,
                          notes=socket.gethostname(),
                          name=str(all_args.algorithm_name) + "_" +
@@ -164,6 +165,7 @@ def main(args):
         eval_envs.close()
 
     if all_args.use_wandb:
+        runner.save()
         run.finish()
     else:
         runner.writter.export_scalars_to_json(str(runner.log_dir + '/summary.json'))

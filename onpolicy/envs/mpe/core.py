@@ -109,6 +109,8 @@ class Agent(Entity):
         # zoe 20200420
         self.goal = None
 
+        self.cluster_id = 0
+
 # multi-agent world
 class World(object):
     def __init__(self):
@@ -116,6 +118,7 @@ class World(object):
         self.agents = []
         self.landmarks = []
         self.walls = []
+        self.limit = 100
         # communication channel dimensionality
         self.dim_c = 0
         # position dimensionality
@@ -138,6 +141,7 @@ class World(object):
         self.world_step = 0
         self.num_agents = 0
         self.num_landmarks = 0
+        self.one_reward = False
 
     # return all entities in the world
     @property
@@ -276,6 +280,16 @@ class World(object):
                     entity.state.p_vel = entity.state.p_vel / np.sqrt(np.square(entity.state.p_vel[0]) +
                                                                       np.square(entity.state.p_vel[1])) * entity.max_speed
             entity.state.p_pos += entity.state.p_vel * self.dt
+            if abs(entity.state.p_pos[0]) > (self.limit - entity.size):
+                if entity.state.p_pos[0] > (self.limit - entity.size):
+                    entity.state.p_pos[0] = self.limit - entity.size
+                else:
+                    entity.state.p_pos[0] = - (self.limit - entity.size)
+            if abs(entity.state.p_pos[1]) > (self.limit - entity.size):
+                if entity.state.p_pos[1] > (self.limit - entity.size):
+                    entity.state.p_pos[1] = self.limit - entity.size
+                else:
+                    entity.state.p_pos[1] = - (self.limit - entity.size)
 
     def update_agent_state(self, agent):
         # set communication state (directly for now)
@@ -309,6 +323,9 @@ class World(object):
         # softmax penetration
         k = self.contact_margin
         penetration = np.logaddexp(0, -(dist - dist_min)/k)*k
+        if dist == 0:
+            print("Dist is 0")
+            dist = 0.01
         force = self.contact_force * delta_pos / dist * penetration
         if entity_a.movable and entity_b.movable:
             # consider mass in collisions
