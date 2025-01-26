@@ -22,7 +22,7 @@ class Runner(object):
         self.device = config['device']
         self.num_agents = config['num_agents']
         if config.__contains__("render_envs"):
-            self.render_envs = config['render_envs']       
+            self.render_envs = config['render_envs']     
 
         # parameters
         self.env_name = self.all_args.env_name
@@ -156,6 +156,10 @@ class Runner(object):
             self.policy.restore(model_dir)
         else:
             policy_actor_state_dict = torch.load(str(self.model_dir) + '/actor.pt')
+            import imageio
+            self.gif_dir = str(self.run_dir / 'gifs')
+            if not os.path.exists(self.gif_dir):
+                os.makedirs(self.gif_dir)
             self.policy.actor.load_state_dict(policy_actor_state_dict)
             if not self.all_args.use_render:
                 policy_critic_state_dict = torch.load(str(self.model_dir) + '/critic.pt')

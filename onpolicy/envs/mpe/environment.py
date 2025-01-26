@@ -127,16 +127,19 @@ class MultiAgentEnv(gym.Env):
         # record observation for each agent
         for i, agent in enumerate(self.agents):
             obs_n.append(self._get_obs(agent))
-            reward_n.append([self._get_reward(agent)])
-            done_n.append(self._get_done(agent))
-            info = {'individual_reward': self._get_reward(agent)}
+            if not self.world.one_reward:
+                reward = self._get_reward(agent)
+                reward_n.append([reward])
             env_info = self._get_info(agent)
-            if 'fail' in env_info.keys():
-                info['fail'] = env_info['fail']
-            info_n.append(info)
+            done_n.append(self._get_done(agent))
+            info_n.append(env_info)
 
         # all agents get total reward in cooperative case, if shared reward, all agents have the same reward, and reward is sum
-        reward = np.sum(reward_n)
+        if self.world.one_reward:
+            reward = self._get_reward(agent)
+        else:
+            # all agents get total reward in cooperative case
+            reward = np.sum(reward_n)
         if self.shared_reward:
             reward_n = [[reward]] * self.n
 
@@ -383,7 +386,7 @@ class MultiAgentEnv(gym.Env):
             else:
                 pos = self.agents[i].state.p_pos
             self.viewers[i].set_bounds(
-                pos[0]-cam_range, pos[0]+cam_range, pos[1]-cam_range, pos[1]+cam_range)
+                pos[0]-cam_range-4, pos[0]+cam_range+4, pos[1]-cam_range-4, pos[1]+cam_range+4)
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
                 self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
