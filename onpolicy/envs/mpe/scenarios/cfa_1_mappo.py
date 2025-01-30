@@ -24,6 +24,7 @@ class Scenario(BaseScenario):
             agent.silent = True
             agent.size = 0.15
             agent.u_noise = 1
+            agent.max_speed = 0.51
         # add landmarks
         world.landmarks = [Landmark() for i in range(num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
