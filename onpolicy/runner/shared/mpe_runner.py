@@ -242,7 +242,7 @@ class MPERunner(Runner):
                 obs, rewards, dones, infos = envs.step(actions_env)
                 episode_rewards.append(rewards)
                 ############ Remove the comment if needed
-                score += rewards[0][0]
+                # score += rewards[0][0]
 
                 rnn_states[dones == True] = np.zeros(((dones == True).sum(), self.recurrent_N, self.hidden_size), dtype=np.float32)
                 masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
@@ -258,7 +258,7 @@ class MPERunner(Runner):
                 else:
                     envs.render('human')
 
-            # score = rewards[0][0]
+            score = rewards[0][0]
             
             print("average episode rewards is: " + str(np.mean(np.sum(np.array(episode_rewards), axis=0))))
             print("score is:" + str(score))
