@@ -9,19 +9,19 @@ class CNNLayer(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1):
         super(CNNLayer, self).__init__()
 
-        active_func = [nn.Tanh(), nn.ReLU()][use_ReLU]
+        # TODO: Maybe change the active_func
+        active_func = nn.ReLU()]
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][use_orthogonal]
-        gain = nn.init.calculate_gain(['tanh', 'relu'][use_ReLU])
+        gain = nn.init.calculate_gain('relu')
 
         def init_(m):
             return init(m, init_method, lambda x: nn.init.constant_(x, 0), gain=gain)
 
-        input_channel = obs_shape[0]
-        input_width = obs_shape[1]
-        input_height = obs_shape[2]
+        input_width = obs_shape[0]
+        input_height = obs_shape[1]
 
         self.cnn = nn.Sequential(
-            init_(nn.Conv2d(in_channels=input_channel,
+            init_(nn.Conv2d(in_channels=1,
                             out_channels=1,
                             kernel_size=kernel_size,
                             stride=stride)
@@ -29,7 +29,7 @@ class CNNLayer(nn.Module):
             active_func,
             Flatten(),
             init_(nn.Linear((input_width - kernel_size + stride) * (input_height - kernel_size + stride),
-                            output_size)
+                            6)
                   ),
             active_func
         )
@@ -65,8 +65,9 @@ class MergedModel(nn.Module):
     def __init__(self, mlp_args, obs_shape):
        (MergedModel, self).__init__()
 
-        self.cnn = CNNLayer(obs_shape, 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
-        flattened_size = mlp_args.output_size
+        self.cnn = CNNLayer((32, 16), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+        # TODO: Chnage this 6 when more agents
+        flattened_size = 6
         self.mlp = MLPLayer(flattened_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
     def forward(self, x):
