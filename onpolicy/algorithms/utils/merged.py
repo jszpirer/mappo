@@ -63,12 +63,11 @@ class MLPLayer(nn.Module):
 
 class MergedModel(nn.Module):
     def __init__(self, mlp_args, obs_shape):
-       (MergedModel, self).__init__()
-
-        self.cnn = CNNLayer((32, 16), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
-        # TODO: Chnage this 6 when more agents
-        flattened_size = 6
-        self.mlp = MLPLayer(flattened_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+       super(MergedModel, self).__init__()
+       self.cnn = CNNLayer((32, 16), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+       # TODO: Chnage this 6 when more agents
+       flattened_size = 6
+       self.mlp = MLPLayer(flattened_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
     def forward(self, x):
         # Extract positon and velocity from x
