@@ -62,11 +62,11 @@ class MLPLayer(nn.Module):
         return x
 
 class MergedModel(nn.Module):
-    def __init__(self, cnn_args, mlp_args, obs_shape):
+    def __init__(self, mlp_args, obs_shape):
        (MergedModel, self).__init__()
 
-        self.cnn = CNNLayer(obs_shape, cnn_args.output_size, cnn_args.use_orthogonal, cnn_args.use_ReLU)
-        flattened_size = cnn_args.output_size
+        self.cnn = CNNLayer(obs_shape, 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+        flattened_size = mlp_args.output_size
         self.mlp = MLPLayer(flattened_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
     def forward(self, x):
