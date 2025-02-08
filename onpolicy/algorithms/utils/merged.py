@@ -6,7 +6,7 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 class CNNLayer(nn.Module):
-    def __init__(self, obs_shape, hidden_size, use_orthogonal, use_ReLU, kernel_size=3, stride=1):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1):
         super(CNNLayer, self).__init__()
 
         active_func = [nn.Tanh(), nn.ReLU()][use_ReLU]
@@ -17,15 +17,21 @@ class CNNLayer(nn.Module):
             return init(m, init_method, lambda x: nn.init.constant_(x, 0), gain=gain)
 
         input_channel = obs_shape[0]
+        input_width = obs_shape[1]
+        input_height = obs_shape[2]
 
         self.cnn = nn.Sequential(
             init_(nn.Conv2d(in_channels=input_channel,
-                            out_channels=hidden_size // 2,
+                            out_channels=1,
                             kernel_size=kernel_size,
                             stride=stride)
                   ),
             active_func,
-            Flatten()
+            Flatten(),
+            init_(nn.Linear((input_width - kernel_size + stride) * (input_height - kernel_size + stride),
+                            output_size)
+                  ),
+            active_func
         )
 
     def forward(self, x):
@@ -59,11 +65,21 @@ class MergedModel(nn.Module):
     def __init__(self, cnn_args, mlp_args, obs_shape):
        (MergedModel, self).__init__()
 
-        self.cnn = CNNLayer(obs_shape, cnn_args.hidden_size, cnn_args.use_orthogonal, cnn_args.use_ReLU)
-        flattened_size = (obs_shape[1] - cnn_args.kernel_size + cnn_args.stride) * (obs_shape[2] - cnn_args.kernel_size + cnn_args.stride) * (cnn_args.hidden_size // 2)
+        self.cnn = CNNLayer(obs_shape, cnn_args.output_size, cnn_args.use_orthogonal, cnn_args.use_ReLU)
+        flattened_size = cnn_args.output_size
         self.mlp = MLPLayer(flattened_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
     def forward(self, x):
+        # Extract positon and velocity from x
+        additional_data = x[:, -4:]
+        x = x[:, :-4]
+
+        # Give x to the CNN
         x = self.cnn(x)
-       .mlp(x)
+
+        # Concatenate the output of the CNN with position and velocity
+        x = torch.cat((x, additional_data), dim=1)
+
+        # Give x to the MLP
+        x = self.mlp(x)
         return x
