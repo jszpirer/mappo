@@ -10,7 +10,7 @@ class CNNLayer(nn.Module):
         super(CNNLayer, self).__init__()
 
         # TODO: Maybe change the active_func
-        active_func = nn.ReLU()]
+        active_func = nn.ReLU()
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][use_orthogonal]
         gain = nn.init.calculate_gain('relu')
 
