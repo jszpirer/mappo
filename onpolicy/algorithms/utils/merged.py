@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch import cat
 from .util import init
 
 class Flatten(nn.Module):
@@ -9,7 +10,8 @@ class CNNLayer(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1):
         super(CNNLayer, self).__init__()
 
-        # TODO: Maybe change the active_func
+
+        #TODO: Maybe change the active_func
         active_func = nn.ReLU()
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][use_orthogonal]
         gain = nn.init.calculate_gain('relu')
@@ -35,6 +37,10 @@ class CNNLayer(nn.Module):
         )
 
     def forward(self, x):
+        print("Inside forward of CNNLayer")
+        print(x.size())
+        x = x.view(x.shape[0], 1, x.shape[1],x.shape[2])
+        print(x.size())
         x = self.cnn(x)
         return x
 
@@ -58,27 +64,41 @@ class MLPLayer(nn.Module):
     def forward(self, x):
         x = self.fc1(x)
         for i in range(self._layer_N):
-            x = self.fc2i
+            x = self.fc2
         return x
 
 class MergedModel(nn.Module):
     def __init__(self, mlp_args, obs_shape):
        super(MergedModel, self).__init__()
-       self.cnn = CNNLayer((32, 16), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+       self.cnn = CNNLayer((16, 16), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        # TODO: Chnage this 6 when more agents
        flattened_size = 6
-       self.mlp = MLPLayer(flattened_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+       # TODO: find a way to make this math automatic cause not correct for the critic
+       self.mlp = MLPLayer(flattened_size*2 + 4, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
     def forward(self, x):
-        # Extract positon and velocity from x
-        additional_data = x[:, -4:]
-        x = x[:, :-4]
+        print("Before forward")
+        print(x.size())
+        # Séparer le tenseur en trois parties
+        tensor1 = x[:, :2, :]  # Tenseur de taille (384, 2, 16)
+        result = tensor1[:, :, :2]
+        additional_data = result.reshape(result.shape[0], 4)
+        print("Additional_data")
+        print(additional_data)
+        tensor2 = x[:, 2:18, :]  # Tenseur de taille (384, 16, 16)
+        tensor3 = x[:, 18:, :]  # Tenseur de taille (384, 16, 16)
 
         # Give x to the CNN
-        x = self.cnn(x)
+        x1 = self.cnn(tensor2)
+        x2 = self.cnn(tensor3)
+        print("After CNNLayer")
+        print(x1.size())
 
         # Concatenate the output of the CNN with position and velocity
-        x = torch.cat((x, additional_data), dim=1)
+        x = cat((additional_data, x1, x2), dim=1)
+
+        print("After concatenation")
+        print(x.size())
 
         # Give x to the MLP
         x = self.mlp(x)
