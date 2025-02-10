@@ -71,10 +71,15 @@ class MergedModel(nn.Module):
        self.cnn = CNNLayer((32, 32), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        # TODO: Chnage this 6 when more agents
        flattened_size = 6
-       input_size = flattened_size*2 + 4
+
+       #input_size = flattened_size*2 + 4
+       # Without position
+       input_size = flattened_size*2 + 2
+       
        #TODOD: find a way to have access to 34 and 3 through args
        #if obs_shape[0]/34 > 1:
-       if obs_shape[0]/66 > 1:
+       #if obs_shape[0]/66 > 1:
+       if obs_shape[0]/65 > 1:
            input_size *= 3
        # TODO: find a way to make this math automatic cause not correct for the critic
        self.mlp = MLPLayer(input_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
@@ -84,15 +89,30 @@ class MergedModel(nn.Module):
         x_inter_list = []
         #TODO: find a way to have access to 34
         #for i in range(x.size()[1]//34):
-        for i in range(x.size()[1]//66):
+        #for i in range(x.size()[1]//66):
+        for i in range(x.size()[1]//65):
             #tensor1 = x[:, i*34:2+i*34, :]
-            tensor1 = x[:, i*66:2+i*66, :]
+            #tensor1 = x[:, i*66:2+i*66, :]
+
+            # Without the position
+            tensor1 = x[:, i*65:1+i*65, :]
+
             result = tensor1[:, :, :2]
-            additional_data = result.reshape(result.shape[0], 4)
+            #additional_data = result.reshape(result.shape[0], 4)
+
+            # Without the position
+            additional_data = result.reshape(result.shape[0], 2)
+            
             #tensor2 = x[:, 2+i*34:18+i*34, :]
             #tensor3 = x[:, 18+i*34:34+i*34, :]
-            tensor2 = x[:, 2+i*66:34+i*66, :]
-            tensor3 = x[:, 34+i*66:66+i*66, :]
+            
+            #tensor2 = x[:, 2+i*66:34+i*66, :]
+            #tensor3 = x[:, 34+i*66:66+i*66, :]
+
+            # Without the position
+            tensor2 = x[:, 1+i*65:33+i*65, :]
+            tensor3 = x[:, 33+i*65:65+i*65, :]
+
             x1 = self.cnn(tensor2)
             x2 = self.cnn(tensor3)
             x_inter = cat((additional_data, x1, x2), dim=1)
