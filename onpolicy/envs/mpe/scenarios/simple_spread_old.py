@@ -9,7 +9,6 @@ class Scenario(BaseScenario):
         world.world_length = args.episode_length
         # set any world properties first
         world.dim_c = 2
-        world.limit = 4
         world.num_agents = args.num_agents
         world.num_landmarks = args.num_landmarks  # 3
         world.collaborative = True
@@ -20,8 +19,6 @@ class Scenario(BaseScenario):
             agent.collide = True
             agent.silent = True
             agent.size = 0.15
-            agent.u_noise = 1
-            agent.max_speed = 0.51
         # add landmarks
         world.landmarks = [Landmark() for i in range(world.num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
@@ -103,5 +100,4 @@ class Scenario(BaseScenario):
                 continue
             comm.append(other.state.c)
             other_pos.append(other.state.p_pos - agent.state.p_pos)
-        # return np.concatenate([agent.state.p_vel] + [agent.state.p_pos] + entity_pos + other_pos)
-        return np.concatenate([agent.state.p_vel] + entity_pos + other_pos)
+        return np.concatenate([agent.state.p_vel] + [agent.state.p_pos] + entity_pos + other_pos + comm)
