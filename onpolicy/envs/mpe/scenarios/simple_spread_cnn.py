@@ -100,7 +100,7 @@ class Scenario(BaseScenario):
             other_pos[round(distance[0]) + 7][round(distance[1]) + 7] = 1
         return np.concatenate(([np.pad(agent.state.p_vel, (0, 16-2), 'constant', constant_values = 0)], [np.pad(agent.state.p_pos, (0, 16-2), 'constant', constant_values = 0)], entity_pos, other_pos), axis=0)
 
-    def observation(self, agent, world):
+    def observation32(self, agent, world):
         # get positions of all entities in this agent's reference frame
         entity_pos = np.zeros((32, 32))
         for entity in world.landmarks:  # world.entities:
@@ -113,3 +113,17 @@ class Scenario(BaseScenario):
             distance = other.state.p_pos - agent.state.p_pos
             other_pos[round(2*distance[0]) + 15][round(2*distance[1]) + 15] = 1
         return np.concatenate(([np.pad(agent.state.p_vel, (0, 32-2), 'constant', constant_values = 0)], [np.pad(agent.state.p_pos, (0, 32-2), 'constant', constant_values = 0)], entity_pos, other_pos), axis=0)
+    
+    def observation(self, agent, world):
+        # get positions of all entities in this agent's reference frame
+        entity_pos = np.zeros((32, 32))
+        for entity in world.landmarks:  # world.entities:
+            distance = entity.state.p_pos - agent.state.p_pos
+            entity_pos[round(2*distance[0]) + 15][round(2*distance[1]) + 15] = 1
+        other_pos = np.zeros((32, 32))
+        for other in world.agents:
+            if other is agent:
+                continue
+            distance = other.state.p_pos - agent.state.p_pos
+            other_pos[round(2*distance[0]) + 15][round(2*distance[1]) + 15] = 1
+        return np.concatenate(([np.pad(agent.state.p_vel, (0, 32-2), 'constant', constant_values = 0)], entity_pos, other_pos), axis=0)

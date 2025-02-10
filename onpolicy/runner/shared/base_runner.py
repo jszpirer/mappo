@@ -156,6 +156,7 @@ class Runner(object):
             self.policy.restore(model_dir)
         else:
             policy_actor_state_dict = torch.load(str(self.model_dir) + '/actor.pt')
+            print(policy_actor_state_dict)
             import imageio
             self.gif_dir = str(self.run_dir / 'gifs')
             if not os.path.exists(self.gif_dir):
