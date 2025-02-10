@@ -86,22 +86,30 @@ class Scenario(BaseScenario):
                     rew -= 1
         return rew
 
-    def observation(self, agent, world):
+    def observation16(self, agent, world):
         # get positions of all entities in this agent's reference frame
-        entity_pos = []
+        entity_pos = np.zeros((16, 16))
         for entity in world.landmarks:  # world.entities:
-            entity_pos.append(entity.state.p_pos - agent.state.p_pos)
-        # entity colors
-        entity_color = []
-        for entity in world.landmarks:  # world.entities:
-            entity_color.append(entity.color)
-        # communication of all other agents
-        comm = []
-        other_pos = []
+            distance = entity.state.p_pos - agent.state.p_pos
+            entity_pos[round(distance[0]) + 7][round(distance[1]) + 7] = 1
+        other_pos = np.zeros((16, 16))
         for other in world.agents:
             if other is agent:
                 continue
-            comm.append(other.state.c)
-            other_pos.append(other.state.p_pos - agent.state.p_pos)
-        # return np.concatenate([agent.state.p_vel] + [agent.state.p_pos] + entity_pos + other_pos)
-        return np.concatenate([agent.state.p_vel] + entity_pos + other_pos)
+            distance = other.state.p_pos - agent.state.p_pos
+            other_pos[round(distance[0]) + 7][round(distance[1]) + 7] = 1
+        return np.concatenate(([np.pad(agent.state.p_vel, (0, 16-2), 'constant', constant_values = 0)], [np.pad(agent.state.p_pos, (0, 16-2), 'constant', constant_values = 0)], entity_pos, other_pos), axis=0)
+
+    def observation(self, agent, world):
+        # get positions of all entities in this agent's reference frame
+        entity_pos = np.zeros((32, 32))
+        for entity in world.landmarks:  # world.entities:
+            distance = entity.state.p_pos - agent.state.p_pos
+            entity_pos[round(2*distance[0]) + 15][round(2*distance[1]) + 15] = 1
+        other_pos = np.zeros((32, 32))
+        for other in world.agents:
+            if other is agent:
+                continue
+            distance = other.state.p_pos - agent.state.p_pos
+            other_pos[round(2*distance[0]) + 15][round(2*distance[1]) + 15] = 1
+        return np.concatenate(([np.pad(agent.state.p_vel, (0, 32-2), 'constant', constant_values = 0)], [np.pad(agent.state.p_pos, (0, 32-2), 'constant', constant_values = 0)], entity_pos, other_pos), axis=0)

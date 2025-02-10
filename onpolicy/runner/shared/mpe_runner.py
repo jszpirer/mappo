@@ -34,6 +34,9 @@ class MPERunner(Runner):
                 # Obser reward and next obs
                 obs, rewards, dones, infos = self.envs.step(actions_env)
 
+                print("Les obs dans mpe_runner")
+                print(obs.shape)
+
                 data = obs, rewards, dones, infos, values, actions, action_log_probs, rnn_states, rnn_states_critic
 
                 # insert data into buffer
@@ -41,10 +44,10 @@ class MPERunner(Runner):
 
                 ####### Remove this comment if needed
                 #add value to the score because for aggregation score in a sum of the rewards
-                #score += rewards[0]
+                score += rewards[0]
             
             
-            score = rewards[0]
+            #score = rewards[0]
             print(score)
             # compute return and update network
             self.compute()
@@ -96,8 +99,12 @@ class MPERunner(Runner):
 
         # replay buffer
         if self.use_centralized_V:
-            share_obs = obs.reshape(self.n_rollout_threads, -1)
-            share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
+            if len(obs[0][0].shape) == 2:
+                share_obs = obs.reshape(self.n_rollout_threads, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
+                share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
+            else:
+                share_obs = obs.reshape(self.n_rollout_threads, -1)
+                share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
         else:
             share_obs = obs
 
@@ -142,9 +149,14 @@ class MPERunner(Runner):
         masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
         masks[dones == True] = np.zeros(((dones == True).sum(), 1), dtype=np.float32)
 
+        # replay buffer
         if self.use_centralized_V:
-            share_obs = obs.reshape(self.n_rollout_threads, -1)
-            share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
+            if len(obs[0][0].shape) == 2:
+                share_obs = obs.reshape(self.n_rollout_threads, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
+                share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
+            else:
+                share_obs = obs.reshape(self.n_rollout_threads, -1)
+                share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
         else:
             share_obs = obs
 
@@ -258,7 +270,7 @@ class MPERunner(Runner):
                 else:
                     envs.render('human')
 
-            # score = rewards[0][0]
+            #score = rewards[0][0]
             
             print("average episode rewards is: " + str(np.mean(np.sum(np.array(episode_rewards), axis=0))))
             print("score is:" + str(score))
