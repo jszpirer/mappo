@@ -124,7 +124,7 @@ class Scenario(BaseScenario):
                     # rew -= 1
                     collide += 1
 
-        return performance, collide
+        return performance
 
     def observation(self, agent, world):
         # get positions of all entities in this agent's reference frame
