@@ -99,7 +99,6 @@ class MergedModel(nn.Module):
             x_inter_list.append(x_inter)
         # Concatenate the output of the CNN with position and velocity
         x = cat(x_inter_list, dim=1)
-
         # Give x to the MLP
         x = self.mlp(x)
         return x
