@@ -45,14 +45,20 @@ class SharedReplayBuffer(object):
         obs_shape = get_shape_from_obs_space(obs_space)
         share_obs_shape = get_shape_from_obs_space(cent_obs_space)
 
+        print("In shared buffer")
+        print(obs_shape)
+        print(share_obs_shape)
+
         if type(obs_shape[-1]) == list:
             obs_shape = obs_shape[:1]
 
         if type(share_obs_shape[-1]) == list:
             share_obs_shape = share_obs_shape[:1]
 
+        
         self.share_obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, num_agents, *share_obs_shape),
                                   dtype=np.float32)
+        print(self.share_obs.shape)
         self.obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, num_agents, *obs_shape), dtype=np.float32)
 
         self.rnn_states = np.zeros(
@@ -104,6 +110,8 @@ class SharedReplayBuffer(object):
         :param active_masks: (np.ndarray) denotes whether an agent is active or dead in the env.
         :param available_actions: (np.ndarray) actions available to each agent. If None, all actions are available.
         """
+        print("In the insert  function")
+        print(share_obs.shape)
         self.share_obs[self.step + 1] = share_obs.copy()
         self.obs[self.step + 1] = obs.copy()
         self.rnn_states[self.step + 1] = rnn_states_actor.copy()

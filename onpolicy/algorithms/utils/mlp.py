@@ -24,6 +24,8 @@ class MLPLayer(nn.Module):
             nn.Linear(hidden_size, hidden_size)), active_func, nn.LayerNorm(hidden_size)) for i in range(self._layer_N)])
 
     def forward(self, x):
+        #print("Just before forward")
+        #print(x.size())
         x = self.fc1(x)
         for i in range(self._layer_N):
             x = self.fc2[i](x)
@@ -42,6 +44,8 @@ class MLPBase(nn.Module):
         self.hidden_size = args.hidden_size
 
         obs_dim = obs_shape[0]
+        print("Obs dim in the MLP")
+        print(obs_dim)
 
         if self._use_feature_normalization:
             self.feature_norm = nn.LayerNorm(obs_dim)

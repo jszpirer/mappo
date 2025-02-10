@@ -2,6 +2,7 @@ import numpy as np
 from onpolicy.envs.mpe.core import World, Agent
 from onpolicy.envs.mpe.scenario import BaseScenario
 from collections import defaultdict
+import math, random
 
 class Scenario(BaseScenario):
     def make_world(self, args):
@@ -126,19 +127,55 @@ class Scenario(BaseScenario):
         return performance
 
     def observation(self, agent, world):
+        # Definition of the range of detection for the agents
+        detection_range = 3
         # get positions of all entities in this agent's reference frame
         entity_pos = []
-        for entity in world.landmarks:  # world.entities:
-            entity_pos.append(entity.state.p_pos - agent.state.p_pos)
-        # entity colors
-        entity_color = []
-        for entity in world.landmarks:  # world.entities:
-            entity_color.append(entity.color)
-        # communication of all other agents
-        comm = []
+        indices = np.array([item for item in range(0, len(world.landmarks))])
+        duplicate = False
+        duplicates = []
+        for i, entity in enumerate(world.landmarks):  # world.entities:
+            if math.dist(entity.state.p_pos, agent.state.p_pos) < detection_range and random.uniform(0,1) > 0.85:
+                index = np.argwhere(indices==i)
+                indices = np.delete(indices, index)
+                entity_pos.append(entity.state.p_pos - agent.state.p_pos)
+                duplicates.append(entity.state.p_pos - agent.state.p_pos)
+                duplicate = True
+            else:
+                entity_pos.append(np.array([0, 0]))
+        if len(indices) > 0:
+            for index in indices:
+                if duplicate:
+                    entity_pos[index] = random.choice(duplicates)
+                else:
+                    x = random.uniform(max(-world.limit, agent.state.p_pos[0] - detection_range), min(world.limit, agent.state.p_pos[0] + detection_range))
+                    y = random.uniform(max(-world.limit, agent.state.p_pos[1] - detection_range), min(world.limit, agent.state.p_pos[1] + detection_range))
+                    entity_pos[index] = agent.state.p_pos - np.array([x, y])  
+
         other_pos = []
+        duplicate = False
+        duplicates = []
+        indices = []
+        i = 0
         for other in world.agents:
             if other is agent: continue
-            comm.append(other.state.c)
-            other_pos.append(other.state.p_pos - agent.state.p_pos)
-        return np.concatenate([agent.state.p_vel] + [agent.state.p_pos] + entity_pos + other_pos + comm)
+            if math.dist(other.state.p_pos, agent.state.p_pos) < detection_range and random.uniform(0,1) > 0.85:
+                noise = np.random.normal(0, 1, other.state.p_pos.shape)
+                position = other.state.p_pos + noise
+                other_pos.append(position - agent.state.p_pos)
+                duplicates.append(position - agent.state.p_pos)
+                duplicate = True
+            else:
+                indices.append(i)
+                other_pos.append(np.array([0, 0]))
+            i += 1
+        if len(indices) > 0:
+            for index in indices:
+                if duplicate:
+                    other_pos[index] = random.choice(duplicates)
+                else:
+                    x = random.uniform(max(-world.limit, agent.state.p_pos[0] - detection_range), min(world.limit, agent.state.p_pos[0] + detection_range))
+                    y = random.uniform(max(-world.limit, agent.state.p_pos[1] - detection_range), min(world.limit, agent.state.p_pos[1] + detection_range)) 
+                    other_pos[index] = agent.state.p_pos - np.array([x, y])                  
+
+        return np.concatenate([agent.state.p_vel] + entity_pos + other_pos)
