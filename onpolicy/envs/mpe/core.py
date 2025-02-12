@@ -142,6 +142,8 @@ class World(object):
         self.num_agents = 0
         self.num_landmarks = 0
         self.one_reward = False
+        self.grid_resolution = 0
+        self.nb_additional_data = 0
 
     # return all entities in the world
     @property
