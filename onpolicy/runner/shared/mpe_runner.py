@@ -34,9 +34,6 @@ class MPERunner(Runner):
                 # Obser reward and next obs
                 obs, rewards, dones, infos = self.envs.step(actions_env)
 
-                print("Les obs dans mpe_runner")
-                print(obs.shape)
-
                 data = obs, rewards, dones, infos, values, actions, action_log_probs, rnn_states, rnn_states_critic
 
                 # insert data into buffer
@@ -51,7 +48,9 @@ class MPERunner(Runner):
             print(score)
             # compute return and update network
             self.compute()
+            print("Before train")
             train_infos = self.train()
+            print("After train")
             
             # post process
             total_num_steps = (episode + 1) * self.episode_length * self.n_rollout_threads
