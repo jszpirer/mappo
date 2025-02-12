@@ -55,6 +55,8 @@ def parse_args(args, parser):
     parser.add_argument("--num_landmarks", type=int, default=3)
     parser.add_argument('--num_agents', type=int,
                         default=2, help="number of players")
+    parser.add_argument("--grid_resolution", type=int, default=0)
+    parser.add_argument("--nb_additional_data", type=int, default=0)
 
     all_args = parser.parse_known_args(args)[0]
 
@@ -64,7 +66,6 @@ def parse_args(args, parser):
 def main(args):
     parser = get_config()
     all_args = parse_args(args, parser)
-    print(all_args)
 
     if all_args.algorithm_name == "rmappo":
         print("u are choosing to use rmappo, we set use_recurrent_policy to be True")
@@ -140,6 +141,9 @@ def main(args):
     envs = make_train_env(all_args)
     eval_envs = make_eval_env(all_args) if all_args.use_eval else None
     num_agents = all_args.num_agents
+
+    print("after initialization")
+    print(all_args.grid_resolution)
 
     config = {
         "all_args": all_args,

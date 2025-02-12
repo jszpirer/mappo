@@ -31,7 +31,7 @@ class CNNLayer(nn.Module):
             active_func,
             Flatten(),
             init_(nn.Linear((input_width - kernel_size + stride) * (input_height - kernel_size + stride),
-                            6)
+                            output_size)
                   ),
             active_func
         )
@@ -67,51 +67,34 @@ class MLPLayer(nn.Module):
 class MergedModel(nn.Module):
     def __init__(self, mlp_args, obs_shape):
        super(MergedModel, self).__init__()
-       #self.cnn = CNNLayer((16, 16), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
-       self.cnn = CNNLayer((32, 32), 10, mlp_args.use_orthogonal, mlp_args.use_ReLU)
-       # TODO: Chnage this 6 when more agents
-       flattened_size = 6
+       flattened_size = max(mlp_args.num_agents*2, mlp_args.num_landmarks*2)
 
-       #input_size = flattened_size*2 + 4
-       # Without position
-       input_size = flattened_size*2 + 2
+       self.cnn = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        
-       #TODOD: find a way to have access to 34 and 3 through args
-       #if obs_shape[0]/34 > 1:
-       #if obs_shape[0]/66 > 1:
-       if obs_shape[0]/65 > 1:
-           input_size *= 3
-       # TODO: find a way to make this math automatic cause not correct for the critic
+
+       input_size = flattened_size*2 + mlp_args.nb_additional_data*2
+
+       self.dim_actor = mlp_args.grid_resolution*2 + mlp_args.nb_additional_data
+       self.grid_resolution = mlp_args.grid_resolution
+       self.nb_additional_data = mlp_args.nb_additional_data
+       
+       if obs_shape[0]/(self.dim_actor) > 1:
+           input_size *= mlp_args.num_agents
+
        self.mlp = MLPLayer(input_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
     def forward(self, x):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
-        #TODO: find a way to have access to 34
-        #for i in range(x.size()[1]//34):
-        #for i in range(x.size()[1]//66):
-        for i in range(x.size()[1]//65):
-            #tensor1 = x[:, i*34:2+i*34, :]
-            #tensor1 = x[:, i*66:2+i*66, :]
 
-            # Without the position
-            tensor1 = x[:, i*65:1+i*65, :]
+        for i in range(x.size()[1]//(self.dim_actor)):
+            tensor1 = x[:, i*self.dim_actor:self.nb_additional_data+i*self.dim_actor, :]
 
             result = tensor1[:, :, :2]
-            #additional_data = result.reshape(result.shape[0], 4)
-
-            # Without the position
-            additional_data = result.reshape(result.shape[0], 2)
+            additional_data = result.reshape(result.shape[0], 2*self.nb_additional_data)
             
-            #tensor2 = x[:, 2+i*34:18+i*34, :]
-            #tensor3 = x[:, 18+i*34:34+i*34, :]
-            
-            #tensor2 = x[:, 2+i*66:34+i*66, :]
-            #tensor3 = x[:, 34+i*66:66+i*66, :]
-
-            # Without the position
-            tensor2 = x[:, 1+i*65:33+i*65, :]
-            tensor3 = x[:, 33+i*65:65+i*65, :]
+            tensor2 = x[:, self.nb_additional_data+i*self.dim_actor:self.grid_resolution+self.nb_additional_data+i*self.dim_actor, :]
+            tensor3 = x[:, self.grid_resolution+self.nb_additional_data+i*self.dim_actor:self.dim_actor+i*self.dim_actor, :]
 
             x1 = self.cnn(tensor2)
             x2 = self.cnn(tensor3)
