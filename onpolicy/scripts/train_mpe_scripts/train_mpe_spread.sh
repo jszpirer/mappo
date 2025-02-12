@@ -1,10 +1,10 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_spread_cnn" 
+scenario="simple_spread_cnn_initpos" 
 num_landmarks=3
 num_agents=3
 algo="mappo" #"rmappo" "ippo"
-exp="simple_spread_cnn"
+exp="simple_spread_cnn_initpos"
 seed_max=1
 project="simple_spread"
 
