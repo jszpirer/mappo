@@ -118,6 +118,9 @@ class MultiAgentEnv(gym.Env):
         else:
             np.random.seed(seed)
 
+    def get_grid_resolution(self):
+        return self.world.grid_resolution
+    
     # step  this is  env.step()
     def step(self, action_n):
         self.current_step += 1
