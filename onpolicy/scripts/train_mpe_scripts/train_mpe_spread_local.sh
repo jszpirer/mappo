@@ -1,12 +1,12 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_spread_cnn_initpos" 
+scenario="simple_spread_cnn_Maurolocal_initpos" 
 num_landmarks=3
 num_agents=3
 grid_resolution=32
-nb_additional_data=2
+nb_additional_data=1
 algo="mappo" #"rmappo" "ippo"
-exp="simple_spread_cnn_initpos"
+exp="simple_spread_cnn_Maurolocal_initpos"
 seed_max=1
 project="simple_spread"
 
