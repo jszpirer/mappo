@@ -37,6 +37,8 @@ def parse_args(args, parser):
     parser.add_argument("--num_landmarks", type=int, default=3)
     parser.add_argument('--num_agents', type=int,
                         default=2, help="number of players")
+    parser.add_argument("--grid_resolution", type=int, default=0)
+    parser.add_argument("--nb_additional_data", type=int, default=0)
 
     all_args = parser.parse_known_args(args)[0]
 
