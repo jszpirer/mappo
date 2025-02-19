@@ -89,21 +89,24 @@ class Scenario(BaseScenario):
         return rew
 
     def observation(self, agent, world):
+        range_observation = 3
         # get positions of all entities in this agent's reference frame
         entity_pos = np.zeros((world.grid_resolution, world.grid_resolution))
         for entity in world.landmarks:  # world.entities:
-            distance = entity.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution/(world.limit*4)
-            scale = (world.grid_resolution//2) - 1
-            entity_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
+            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= 3:
+                distance = entity.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution/(world.limit*4)
+                scale = (world.grid_resolution//2) - 1
+                entity_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
         other_pos = np.zeros((world.grid_resolution, world.grid_resolution))
         for other in world.agents:
             if other is agent:
                 continue
-            distance = other.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution/(world.limit*4)
-            scale = (world.grid_resolution//2) - 1
-            other_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
+            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= 3:
+                distance = other.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution/(world.limit*4)
+                scale = (world.grid_resolution//2) - 1
+                other_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
         additional_data = [[np.pad(agent.state.p_vel, (0, world.grid_resolution-2), 'constant', constant_values = 0)], [np.pad(agent.state.p_pos, (0, world.grid_resolution-2), 'constant', constant_values = 0)]]
         
         return np.concatenate(tuple(additional_data[i] for i in range(world.nb_additional_data)) + (entity_pos, other_pos), axis=0)
