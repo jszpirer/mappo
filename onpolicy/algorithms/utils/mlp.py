@@ -46,6 +46,7 @@ class MLPBase(nn.Module):
         obs_dim = obs_shape[0]
         print("Obs dim in the MLP")
         print(obs_dim)
+        print(args.experiment_name)
 
         if self._use_feature_normalization:
             self.feature_norm = nn.LayerNorm(obs_dim)

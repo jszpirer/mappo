@@ -1,18 +1,18 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_spread_cnn_Maurolocal" 
+scenario="simple_spread_cnn" 
 num_landmarks=3
 num_agents=3
 grid_resolution=32
-nb_additional_data=1
+nb_additional_data=2
 algo="mappo" #"rmappo" "ippo"
-exp="simple_spread_cnn_Maurolocal"
+exp="simple_spread_cnn"
 seed_max=5
 project="simple_spread_3.85agents"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in 8 9 10
+for seed in 9 10
 do
     echo "seed is ${seed}:"
     CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
