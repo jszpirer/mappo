@@ -77,9 +77,10 @@ class MergedModel(nn.Module):
            input_size = flattened_size*2 + mlp_args.nb_additional_data*2
            self.dim_actor = mlp_args.grid_resolution*2 + mlp_args.nb_additional_data
        else:
+           # TODO: Changer ce qui doit l'être puisque là je n'ai aucune marge de manoeuvre
            flattened_size = 6
            input_size = 21
-           self.dim_actor = 0
+           self.dim_actor = 35
 
        self.cnn = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        
@@ -96,18 +97,37 @@ class MergedModel(nn.Module):
         x_inter_list = []
 
         for i in range(x.size()[1]//(self.dim_actor)):
-            tensor1 = x[:, i*self.dim_actor:self.nb_additional_data+i*self.dim_actor, :]
+            if "simple_spread" in self.experiment_name:
+                tensor1 = x[:, i*self.dim_actor:self.nb_additional_data+i*self.dim_actor, :]
+    
+                result = tensor1[:, :, :2]
+                additional_data = result.reshape(result.shape[0], 2*self.nb_additional_data)
+                
+                tensor2 = x[:, self.nb_additional_data+i*self.dim_actor:self.grid_resolution+self.nb_additional_data+i*self.dim_actor, :]
+                tensor3 = x[:, self.grid_resolution+self.nb_additional_data+i*self.dim_actor:self.dim_actor+i*self.dim_actor, :]
+    
+                x1 = self.cnn(tensor2)
+                x2 = self.cnn(tensor3)
+                x_inter = cat((additional_data, x1, x2), dim=1)
+                x_inter_list.append(x_inter)
+            else:
+                tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                result = tensor1[:, :, :2]
+                velocity = result.reshape(result.shape[0], 2)
 
-            result = tensor1[:, :, :2]
-            additional_data = result.reshape(result.shape[0], 2*self.nb_additional_data)
-            
-            tensor2 = x[:, self.nb_additional_data+i*self.dim_actor:self.grid_resolution+self.nb_additional_data+i*self.dim_actor, :]
-            tensor3 = x[:, self.grid_resolution+self.nb_additional_data+i*self.dim_actor:self.dim_actor+i*self.dim_actor, :]
+                tensor2 = x[:, 1+i*self.dim_actor:2+i*self.dim_actor, :]
+                result = tensor2[:, :, :3]
+                color = result.reshape(result.shape[0], 3)
 
-            x1 = self.cnn(tensor2)
-            x2 = self.cnn(tensor3)
-            x_inter = cat((additional_data, x1, x2), dim=1)
-            x_inter_list.append(x_inter)
+                tensor3 = x[:, 2+i*self.dim_actor:3+i*self.dim_actor, :]
+                result = tensor3[:, :, :10]
+                comm = result.reshape(result.shape[0], 10)
+
+                tensor4 = x[:, 3+i*self.dim_actor:(i+1)*self.dim_actor, :]
+
+                x4 = self.cnn(tensor4)
+                x_inter = cat((velocity, color, comm, x4), dim=1)
+                x_inter_list.append(x_inter)
         # Concatenate the output of the CNN with position and velocity
         x = cat(x_inter_list, dim=1)
         # Give x to the MLP
