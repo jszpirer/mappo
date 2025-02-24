@@ -13,6 +13,8 @@ class Scenario(BaseScenario):
         world.collaborative = True  # whether agents share rewards
         # add agents
         world.num_agents = args.num_agents  # 2
+        world.grid_resolution = args.grid_resolution
+        world.nb_additional_data = args.nb_additional_data
         assert world.num_agents == 2, (
             "only 2 agents is supported, check the config.py.")
         world.agents = [Agent() for i in range(world.num_agents)]
@@ -71,31 +73,23 @@ class Scenario(BaseScenario):
         return -dist2  # np.exp(-dist2)
 
     def observation(self, agent, world):
-        # goal positions
-        # goal_pos = [np.zeros(world.dim_p), np.zeros(world.dim_p)]
-        # if agent.goal_a is not None:
-        #     goal_pos[0] = agent.goal_a.state.p_pos - agent.state.p_pos
-        # if agent.goal_b is not None:
-        #     goal_pos[1] = agent.goal_b.state.p_pos - agent.state.p_pos
-        # goal color
         goal_color = [np.zeros(world.dim_color), np.zeros(world.dim_color)]
-        # if agent.goal_a is not None:
-        #     goal_color[0] = agent.goal_a.color
         if agent.goal_b is not None:
             goal_color[1] = agent.goal_b.color
-
         # get positions of all entities in this agent's reference frame
-        entity_pos = []
+        entity_pos = np.zeros((world.grid_resolution, world.grid_resolution))
         for entity in world.landmarks:  # world.entities:
-            entity_pos.append(entity.state.p_pos - agent.state.p_pos)
-        # entity colors
-        entity_color = []
-        for entity in world.landmarks:  # world.entities:
-            entity_color.append(entity.color)
+            distance = entity.state.p_pos - agent.state.p_pos
+            coef = world.grid_resolution/(world.limit*4)
+            scale = (world.grid_resolution//2) - 1
+            entity_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
         # communication of all other agents
         comm = []
         for other in world.agents:
             if other is agent:
                 continue
             comm.append(other.state.c)
-        return np.concatenate([agent.state.p_vel] + entity_pos + [goal_color[1]] + comm)
+        vel = [np.pad(agent.state.p_vel, (0, world.grid_resolution-2), 'constant', constant_values = 0)]
+        goal_color = [np.pad(goal_color[1], (0, world.grid_resolution-3), 'constant', constant_values = 0)]
+        comm_padded = [np.pad(comm[0], (0, world.grid_resolution-10), 'constant', constant_values = 0)]
+        return np.concatenate((vel, goal_color, comm_padded) + (entity_pos), axis=0)

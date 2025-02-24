@@ -66,15 +66,23 @@ class MLPLayer(nn.Module):
 
 class MergedModel(nn.Module):
     def __init__(self, mlp_args, obs_shape):
+       print("In the MergedModel initialization")
        super(MergedModel, self).__init__()
-       flattened_size = max(mlp_args.num_agents*2, mlp_args.num_landmarks*2)
+       self.experiment_name = mlp_args.experiment_name
+       print(self.experiment_name)
+       print("simple_spread" in self.experiment_name)
+
+       if "simple_spread" in self.experiment_name:
+           flattened_size = max(mlp_args.num_agents*2, mlp_args.num_landmarks*2)
+           input_size = flattened_size*2 + mlp_args.nb_additional_data*2
+           self.dim_actor = mlp_args.grid_resolution*2 + mlp_args.nb_additional_data
+       else:
+           flattened_size = 6
+           input_size = 21
+           self.dim_actor = 0
 
        self.cnn = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        
-
-       input_size = flattened_size*2 + mlp_args.nb_additional_data*2
-
-       self.dim_actor = mlp_args.grid_resolution*2 + mlp_args.nb_additional_data
        self.grid_resolution = mlp_args.grid_resolution
        self.nb_additional_data = mlp_args.nb_additional_data
        
