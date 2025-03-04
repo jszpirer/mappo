@@ -92,7 +92,8 @@ class MergedModel(nn.Module):
            input_size = 21
            self.dim_actor = 35
 
-       self.cnn = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+       self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+       self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        
        self.grid_resolution = mlp_args.grid_resolution
        self.nb_additional_data = mlp_args.nb_additional_data
@@ -119,8 +120,8 @@ class MergedModel(nn.Module):
                 tensor2 = x[:, self.nb_additional_data+i*self.dim_actor:self.grid_resolution+self.nb_additional_data+i*self.dim_actor, :]
                 tensor3 = x[:, self.grid_resolution+self.nb_additional_data+i*self.dim_actor:self.dim_actor+i*self.dim_actor, :]
     
-                x1 = self.cnn(tensor2)
-                x2 = self.cnn(tensor3)
+                x1 = self.cnn1(tensor2)
+                x2 = self.cnn2(tensor3)
                 x_inter = cat((additional_data, x1, x2), dim=1)
                 x_inter_list.append(x_inter)
             elif "local_withpos" in self.experiment_name:
