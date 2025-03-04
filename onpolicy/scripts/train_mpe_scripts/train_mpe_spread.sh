@@ -1,14 +1,14 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_spread" 
+scenario="simple_spread_nonoise" 
 num_landmarks=3
 num_agents=3
 grid_resolution=32
 nb_additional_data=2
 algo="mappo" #"rmappo" "ippo"
-exp="simple_spread"
+exp="simple_spread_nonoise"
 seed_max=5
-project="simple_spread_3.85agentslandmarks"
+project="simple_spread_nonoise"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
