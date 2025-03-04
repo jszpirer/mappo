@@ -269,6 +269,9 @@ class SubprocVecEnv(ShareVecEnv):
         for remote in self.remotes:
             remote.send(('reset', None))
         obs = [remote.recv() for remote in self.remotes]
+        stacked = np.stack(obs)
+        print("Shape after stack")
+        print(stacked.shape)
         return np.stack(obs)
 
 

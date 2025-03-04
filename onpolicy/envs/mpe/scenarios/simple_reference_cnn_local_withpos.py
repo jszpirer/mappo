@@ -12,7 +12,7 @@ class Scenario(BaseScenario):
         world.limit = 4
         world.collaborative = True  # whether agents share rewards
         # add agents
-        world.num_agents = args.num_agents  # 2
+        world.num_agents = 2  # 2
         world.grid_resolution = args.grid_resolution
         world.nb_additional_data = args.nb_additional_data
         assert world.num_agents == 2, (
@@ -27,7 +27,7 @@ class Scenario(BaseScenario):
             # agent.u_noise = 1e-1
             # agent.c_noise = 1e-1
         # add landmarks
-        world.num_landmarks = args.num_landmarks  # 3
+        world.num_landmarks = 3  # 3
         world.landmarks = [Landmark() for i in range(world.num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
             landmark.name = 'landmark %d' % i
@@ -73,24 +73,30 @@ class Scenario(BaseScenario):
         return -dist2  # np.exp(-dist2)
 
     def observation(self, agent, world):
+        range_observation = 3
         goal_color = [np.zeros(world.dim_color), np.zeros(world.dim_color)]
         if agent.goal_b is not None:
             goal_color[1] = agent.goal_b.color
         # get positions of all entities in this agent's reference frame
         entity_pos = np.zeros((world.grid_resolution, world.grid_resolution))
         for entity in world.landmarks:  # world.entities:
-            distance = entity.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution/(world.limit*4)
-            scale = (world.grid_resolution//2) - 1
-            entity_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
+            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= range_observation:
+                distance = entity.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution/(world.limit*4)
+                scale = (world.grid_resolution//2) - 1
+                entity_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
         # communication of all other agents
         comm = []
         for other in world.agents:
             if other is agent:
                 continue
-            comm.append(other.state.c)
+            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= range_observation:
+                comm.append(other.state.c)
+            else:
+                comm.append(np.zeros(10))
+        position = [np.pad(agent.state.p_pos, (0, world.grid_resolution-2), 'constant', constant_values = 0)]
         vel = [np.pad(agent.state.p_vel, (0, world.grid_resolution-2), 'constant', constant_values = 0)]
         goal_color = [np.pad(goal_color[1], (0, world.grid_resolution-3), 'constant', constant_values = 0)]
         comm_padded = [np.pad(comm[0], (0, world.grid_resolution-10), 'constant', constant_values = 0)]
-        observations = np.concatenate((np.array(vel), np.array(goal_color), np.array(comm_padded), np.array(entity_pos)), axis=0)
+        observations = np.concatenate((np.array(position), np.array(vel), np.array(goal_color), np.array(comm_padded), np.array(entity_pos)), axis=0)
         return observations

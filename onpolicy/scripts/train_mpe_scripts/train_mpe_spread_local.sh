@@ -8,11 +8,11 @@ nb_additional_data=1
 algo="mappo" #"rmappo" "ippo"
 exp="simple_spread_cnn_Maurolocal"
 seed_max=5
-project="simple_spread_3.85agents"
+project="simple_spread_3.85agentslandmarks"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in 8 9 10
+for seed in 1 2 3 4 5
 do
     echo "seed is ${seed}:"
     CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
