@@ -20,7 +20,7 @@ class Scenario(BaseScenario):
             agent.collide = True
             agent.silent = True
             agent.size = 0.15
-            # agent.u_noise = 1
+            agent.u_noise = args.wheel_noise
             # agent.max_speed = 0.51
         # add landmarks
         world.landmarks = [Landmark() for i in range(world.num_landmarks)]
