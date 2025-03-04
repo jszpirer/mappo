@@ -19,7 +19,9 @@ class Scenario(BaseScenario):
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             agent.collide = False
-            agent.size = 0.075
+            agent.size = 0.15
+            agent.u_noise = 1
+            agent.max_speed = 0.51
         # speaker
         world.agents[0].movable = False
         # listener
@@ -55,7 +57,10 @@ class Scenario(BaseScenario):
             np.array([0.45, 0.45, 0.45])
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            if agent.movable:
+                agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            else:
+                agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
@@ -92,7 +97,7 @@ class Scenario(BaseScenario):
 
         # speaker
         if not agent.movable:
-            return np.concatenate([goal_color])
+            return np.concatenate([np.pad(goal_color, (0, 8), 'constant', constant_values=0)])
         # listener
         if agent.silent:
             return np.concatenate([agent.state.p_vel] + entity_pos + comm)

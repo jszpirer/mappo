@@ -69,13 +69,23 @@ class MergedModel(nn.Module):
        print("In the MergedModel initialization")
        super(MergedModel, self).__init__()
        self.experiment_name = mlp_args.experiment_name
-       print(self.experiment_name)
-       print("simple_spread" in self.experiment_name)
 
        if "simple_spread" in self.experiment_name:
            flattened_size = max(mlp_args.num_agents*2, mlp_args.num_landmarks*2)
            input_size = flattened_size*2 + mlp_args.nb_additional_data*2
            self.dim_actor = mlp_args.grid_resolution*2 + mlp_args.nb_additional_data
+       elif "local_withpos" in self.experiment_name:
+           flattened_size = 6
+           input_size = 21
+           self.dim_actor = 36
+       elif "speaker" in self.experiment_name:
+           flattened_size = 6
+           input_size = 11
+           self.dim_actor = 34
+       elif "color" in self.experiment_name:
+           flattened_size = 6
+           input_size = 33
+           self.dim_actor = 99
        else:
            # TODO: Changer ce qui doit l'être puisque là je n'ai aucune marge de manoeuvre
            flattened_size = 6
@@ -88,7 +98,10 @@ class MergedModel(nn.Module):
        self.nb_additional_data = mlp_args.nb_additional_data
        
        if obs_shape[0]/(self.dim_actor) > 1:
-           input_size *= mlp_args.num_agents
+           if "local_withpos" in self.experiment_name:
+               input_size = 46
+           else:
+               input_size *= mlp_args.num_agents
 
        self.mlp = MLPLayer(input_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
@@ -110,6 +123,72 @@ class MergedModel(nn.Module):
                 x2 = self.cnn(tensor3)
                 x_inter = cat((additional_data, x1, x2), dim=1)
                 x_inter_list.append(x_inter)
+            elif "local_withpos" in self.experiment_name:
+                tensor0 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                result = tensor0[:, :, :2]
+                position = result.reshape(result.shape[0], 2)
+
+                tensor1 = x[:, 1+i*self.dim_actor:2+i*self.dim_actor, :]
+                result = tensor1[:, :, :2]
+                velocity = result.reshape(result.shape[0], 2)
+
+                tensor2 = x[:, 2+i*self.dim_actor:3+i*self.dim_actor, :]
+                result = tensor2[:, :, :3]
+                color = result.reshape(result.shape[0], 3)
+
+                tensor3 = x[:, 3+i*self.dim_actor:4+i*self.dim_actor, :]
+                result = tensor3[:, :, :10]
+                comm = result.reshape(result.shape[0], 10)
+
+                tensor4 = x[:, 4+i*self.dim_actor:(i+1)*self.dim_actor, :]
+                x4 = self.cnn(tensor4)
+                
+                if x.size()[1]//(self.dim_actor) > 1:
+                    x_inter = cat((position, velocity, color, comm, x4), dim=1)
+                else:
+                    x_inter = cat((velocity, color, comm, x4), dim=1)
+                x_inter_list.append(x_inter)
+            elif "speaker" in self.experiment_name:
+                tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                result = tensor1[:, :, :2]
+                velocity = result.reshape(result.shape[0], 2)
+
+                tensor2 = x[:, 1+i*self.dim_actor:2+i*self.dim_actor, :]
+                result = tensor2[:, :, :3]
+                color = result.reshape(result.shape[0], 3)
+
+                tensor4 = x[:, 2+i*self.dim_actor:(i+1)*self.dim_actor, :]
+
+                x4 = self.cnn(tensor4)
+                x_inter = cat((velocity, color, x4), dim=1)
+                x_inter_list.append(x_inter)
+            elif "color" in self.experiment_name:
+                tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                result = tensor1[:, :, :2]
+                velocity = result.reshape(result.shape[0], 2)
+
+                tensor2 = x[:, 1+i*self.dim_actor:2+i*self.dim_actor, :]
+                result = tensor2[:, :, :3]
+                color = result.reshape(result.shape[0], 3)
+
+                tensor3 = x[:, 2+i*self.dim_actor:3+i*self.dim_actor, :]
+                result = tensor3[:, :, :10]
+                comm = result.reshape(result.shape[0], 10)
+
+                tensor4 = x[:, 3+i*self.dim_actor:35+i*self.dim_actor, :]
+                x4 = self.cnn(tensor4)
+
+                tensor5 = x[:, 35+i*self.dim_actor:67+i*self.dim_actor, :]
+                x5 = self.cnn(tensor5)
+
+                tensor6 = x[:, 67+i*self.dim_actor:99+i*self.dim_actor, :]
+                x6 = self.cnn(tensor6)
+                
+
+                x_inter = cat((velocity, color, comm, x4, x5, x6), dim=1)
+                x_inter_list.append(x_inter)
+
+
             else:
                 tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
                 result = tensor1[:, :, :2]
