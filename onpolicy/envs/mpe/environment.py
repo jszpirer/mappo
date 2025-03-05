@@ -99,7 +99,6 @@ class MultiAgentEnv(gym.Env):
         if len(obs_dim) > 1:
             share_obs_dim_shape = (share_obs_dim, obs_dim[1])
         else:
-            print("Check in the environment file")
             share_obs_dim_shape = (share_obs_dim,)
         
         self.share_observation_space = [spaces.Box(

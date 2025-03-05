@@ -109,8 +109,6 @@ class Agent(Entity):
         # zoe 20200420
         self.goal = None
 
-        self.cluster_id = 0
-
 # multi-agent world
 class World(object):
     def __init__(self):
