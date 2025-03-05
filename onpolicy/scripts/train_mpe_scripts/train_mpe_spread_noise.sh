@@ -1,12 +1,12 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_spread_nonoise" 
+scenario="simple_spread" 
 num_landmarks=3
 num_agents=3
 grid_resolution=32
 nb_additional_data=2
 algo="mappo" #"rmappo" "ippo"
-exp="simple_spread_nonoise"
+exp="simple_spread"
 seed_max=5
 project="simple_spread_noise"
 
