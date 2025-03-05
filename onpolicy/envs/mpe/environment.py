@@ -99,6 +99,7 @@ class MultiAgentEnv(gym.Env):
         if len(obs_dim) > 1:
             share_obs_dim_shape = (share_obs_dim, obs_dim[1])
         else:
+            print("Check in the environment file")
             share_obs_dim_shape = (share_obs_dim,)
         
         self.share_observation_space = [spaces.Box(
@@ -146,6 +147,7 @@ class MultiAgentEnv(gym.Env):
 
         # all agents get total reward in cooperative case, if shared reward, all agents have the same reward, and reward is sum
         if self.world.one_reward:
+            print("Test if world.one_reward")
             reward = self._get_reward(agent)
         else:
             # all agents get total reward in cooperative case
