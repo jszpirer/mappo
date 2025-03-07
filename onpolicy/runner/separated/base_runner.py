@@ -110,6 +110,13 @@ class Runner(object):
                                        self.envs.action_space[agent_id])
             self.buffer.append(bu)
             self.trainer.append(tr)
+        
+        if self.use_render:
+            for agent_id in range(self.num_agents):
+                if self.trainer[agent_id]._use_valuenorm:
+                    print("Value normalization")
+                    policy_vnrom_state_dict = torch.load(str(self.model_dir) + '/vnrom_agent' + str(agent_id) + '.pt')
+                    self.trainer[agent_id].value_normalizer.load_state_dict(policy_vnrom_state_dict)
             
     def run(self):
         raise NotImplementedError
@@ -201,9 +208,6 @@ class Runner(object):
             self.policy[agent_id].critic.load_state_dict(policy_critic_state_dict)
             print("Before the error")
             print(self.num_agents)
-            if self.trainer[agent_id]._use_valuenorm:
-                policy_vnrom_state_dict = torch.load(str(self.model_dir) + '/vnrom_agent' + str(agent_id) + '.pt')
-                self.trainer[agent_id].value_normalizer.load_state_dict(policy_vnrom_state_dict)
 
     def log_train(self, train_infos, total_num_steps): 
         for agent_id in range(self.num_agents):
