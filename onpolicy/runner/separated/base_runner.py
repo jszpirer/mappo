@@ -96,6 +96,7 @@ class Runner(object):
         if self.model_dir is not None:
             self.restore()
 
+        print("Creation of the trainer list")
         self.trainer = []
         self.buffer = []
         for agent_id in range(self.num_agents):
@@ -198,6 +199,8 @@ class Runner(object):
             self.policy[agent_id].actor.load_state_dict(policy_actor_state_dict)
             policy_critic_state_dict = torch.load(str(self.model_dir) + '/critic_agent' + str(agent_id) + '.pt')
             self.policy[agent_id].critic.load_state_dict(policy_critic_state_dict)
+            print("Before the error")
+            print(self.num_agents)
             if self.trainer[agent_id]._use_valuenorm:
                 policy_vnrom_state_dict = torch.load(str(self.model_dir) + '/vnrom_agent' + str(agent_id) + '.pt')
                 self.trainer[agent_id].value_normalizer.load_state_dict(policy_vnrom_state_dict)

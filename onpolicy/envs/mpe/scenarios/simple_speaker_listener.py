@@ -20,7 +20,7 @@ class Scenario(BaseScenario):
             agent.name = 'agent %d' % i
             agent.collide = False
             agent.size = 0.15
-            agent.u_noise = 1
+            agent.u_noise = args.wheel_noise
             agent.max_speed = 0.51
         # speaker
         world.agents[0].movable = False
