@@ -58,6 +58,7 @@ def parse_args(args, parser):
     parser.add_argument("--grid_resolution", type=int, default=0)
     parser.add_argument("--nb_additional_data", type=int, default=0)
     parser.add_argument("--wheel_noise", type=float, default=0)
+    parser.add_argument("--range_noise", type=float, default=0)
 
     all_args = parser.parse_known_args(args)[0]
 

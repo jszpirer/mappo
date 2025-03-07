@@ -21,7 +21,8 @@ class Scenario(BaseScenario):
             agent.silent = True
             agent.size = 0.15
             agent.u_noise = args.wheel_noise
-            # agent.max_speed = 0.51
+            print("Noise: "+str(agent.u_noise))
+            agent.max_speed = 0.51
         # add landmarks
         world.landmarks = [Landmark() for i in range(world.num_landmarks)]
         for i, landmark in enumerate(world.landmarks):

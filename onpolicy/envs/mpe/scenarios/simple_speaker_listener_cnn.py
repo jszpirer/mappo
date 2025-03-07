@@ -22,7 +22,7 @@ class Scenario(BaseScenario):
             agent.name = 'agent %d' % i
             agent.collide = False
             agent.size = 0.15
-            agent.u_noise = 1
+            # agent.u_noise = 1
             agent.max_speed = 0.51
         # speaker
         world.agents[0].movable = False
@@ -85,29 +85,40 @@ class Scenario(BaseScenario):
         if agent.goal_b is not None:
             goal_color = agent.goal_b.color
 
-        # get positions of all entities in this agent's reference frame
-        entity_pos = np.zeros((world.grid_resolution, world.grid_resolution))
-        for entity in world.landmarks:  # world.entities:
+        # Initialize entity positions
+        entity_positions = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.num_landmarks)]
+
+        # Calculate positions of all entities in this agent's reference frame
+        for i, entity in enumerate(world.landmarks):
             distance = entity.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution/(world.limit*4)
-            scale = (world.grid_resolution//2) - 1
-            entity_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
+            coef = world.grid_resolution / (world.limit * 4)
+            scale = (world.grid_resolution // 2) - 1
+            x = round(coef * distance[0]) + scale
+            y = round(coef * distance[1]) + scale
+            entity_positions[i][x][y] = 1
 
         # communication of all other agents
-        comm = []
+        comm = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.dim_c)]
+        
         for other in world.agents:
             if other is agent or (other.state.c is None):
                 continue
-            comm.append(other.state.c)
+            indices = [index for index, value in enumerate(other.state.c) if value != 1]
+            distance = other.state.p_pos - agent.state.p_pos
+            coef = world.grid_resolution / (world.limit * 4)
+            scale = (world.grid_resolution // 2) - 1
+            x = round(coef * distance[0]) + scale
+            y = round(coef * distance[1]) + scale
+            for index in indices:
+                comm[index][x][y] = 1
 
         # speaker
         if not agent.movable:
             goal_color = [np.pad(goal_color, (0, world.grid_resolution-3), 'constant', constant_values = 0)]
-            observations = np.concatenate((np.array([np.zeros(world.grid_resolution)]), np.array(goal_color), np.array(np.zeros((world.grid_resolution, world.grid_resolution)))), axis=0)
+            observations = np.concatenate((np.array([np.zeros(world.grid_resolution)]), np.array(goal_color), np.array(np.zeros((world.grid_resolution-1, world.grid_resolution))),  np.vstack(np.zeros((5, world.grid_resolution, world.grid_resolution)))), axis=0)
             return observations
         # listener
         if agent.silent:
             vel = [np.pad(agent.state.p_vel, (0, world.grid_resolution-2), 'constant', constant_values = 0)]
-            comm_padded = [np.pad(comm[0], (0, world.grid_resolution-3), 'constant', constant_values = 0)]
-            observations = np.concatenate((np.array(vel), np.array(comm_padded), np.array(entity_pos)), axis=0)
+            observations = np.concatenate((np.array(vel), np.vstack(comm), np.vstack(entity_positions)), axis=0)
             return observations
