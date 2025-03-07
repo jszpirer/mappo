@@ -34,7 +34,7 @@ class CNNLayer(nn.Module):
                   ),
             active_func,
             Flatten(),
-            init_(nn.Linear((input_width - kernel_size + stride) * (input_height - kernel_size + stride),
+            init_(nn.Linear((input_width - kernel_size + stride) * (input_height - kernel_size + stride) * output_channels,
                             output_size)
                   ),
             active_func
