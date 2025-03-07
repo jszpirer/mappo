@@ -11,7 +11,9 @@ class Scenario(BaseScenario):
         world.dim_c = 2
         world.limit = 4
         world.num_agents = args.num_agents
+        print("Number of agents : " + str(args.num_agents))
         world.num_landmarks = args.num_landmarks  # 3
+        print("Number of landmarks : " + str(args.num_landmarks))
         world.collaborative = True
         self.range_noise = args.range_noise
         # add agents
