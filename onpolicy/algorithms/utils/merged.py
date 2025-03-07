@@ -43,8 +43,6 @@ class CNNLayer(nn.Module):
     def forward(self, x):
         if not self.multiple_channels:
             x = x.view(x.shape[0], 1, x.shape[1],x.shape[2])
-        print("Shape before forward")
-        print(x.shape)
         x = self.cnn(x)
         return x
 
