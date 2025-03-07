@@ -83,7 +83,7 @@ class MergedModel(nn.Module):
            self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        elif "speaker" in self.experiment_name:
            output_comm = mlp_args.output_comm
-           nb_output_channels = mlp.num_output_channels
+           nb_output_channels = mlp_args.num_output_channels
            input_size = 6 + output_comm + 2
            self.dim_actor = 1 + 96 + 96
            self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels)
