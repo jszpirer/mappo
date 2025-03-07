@@ -9,7 +9,7 @@ out_channels=3
 algo="mappo" #"rmappo" "ippo"
 exp="simple_speaker_listener_cnn"
 seed_max=5
-project="simple_speaker_listener_noise"
+project="simple_speaker_listener_noisetest"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 for seed in `seq ${seed_max}`;
