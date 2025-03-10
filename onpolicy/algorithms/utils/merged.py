@@ -127,6 +127,9 @@ class MergedModel(nn.Module):
                 x_inter = cat((additional_data, x1, x2), dim=1)
                 x_inter_list.append(x_inter)
             elif "goalcolor" in self.experiment_name:
+                if x.size()[1]//(self.dim_actor) > 1:
+                    print("test shared observations")
+                    print(x[0])
                 if self.agent_ID == 1:
                     tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
                     result = tensor1[:, :, :2]
