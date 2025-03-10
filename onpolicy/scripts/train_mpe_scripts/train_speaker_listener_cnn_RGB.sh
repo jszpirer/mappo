@@ -3,15 +3,15 @@ env="MPE"
 scenario="simple_speaker_listener_cnn_goalcolor"
 num_landmarks=3
 num_agents=2
-grid_resolution=48
+grid_resolution=32
 nb_additional_data=2
 out_channels=3
 output_comm=3
 stride=2
 algo="mappo" #"rmappo" "ippo"
-exp="simple_speaker_listener_cnn_goalcolor48"
+exp="simple_speaker_listener_cnn_goalcolorsharedcritic"
 seed_max=5
-project="simple_speaker_listener_noise"
+project="simple_speaker_listener_noisetest"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 for seed in `seq ${seed_max}`;
