@@ -1,15 +1,15 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_speaker_listener_cnn_goalcolor"
+scenario="simple_speaker_listener_copilotcnn_goalcolor"
 num_landmarks=3
 num_agents=2
-grid_resolution=48
+grid_resolution=32
 nb_additional_data=2
 out_channels=3
 output_comm=3
 stride=2
 algo="mappo" #"rmappo" "ippo"
-exp="simple_speaker_listener_cnn_goalcolor48"
+exp="simple_speaker_listener_copilotcnn_goalcolor"
 seed_max=5
 project="simple_speaker_listener_noise"
 

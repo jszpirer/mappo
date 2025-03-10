@@ -1,15 +1,13 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_speaker_listener_cnn_goalcolor"
+scenario="simple_speaker_listener_cnn_goalcomm"
 num_landmarks=3
 num_agents=2
-grid_resolution=48
+grid_resolution=32
 nb_additional_data=2
 out_channels=3
-output_comm=3
-stride=2
 algo="mappo" #"rmappo" "ippo"
-exp="simple_speaker_listener_cnn_goalcolor48"
+exp="simple_speaker_listener_cnn_goalcomm"
 seed_max=5
 project="simple_speaker_listener_noise"
 
@@ -21,6 +19,5 @@ do
     --scenario_name ${scenario} --num_agents ${num_agents} --num_landmarks ${num_landmarks} --seed ${seed} \
     --n_training_threads 1 --n_rollout_threads 128 --num_mini_batch 1 --episode_length 125 --num_env_steps 15000000 \
     --ppo_epoch 15 --gain 0.01 --lr 7e-4 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
-    --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --share_policy --num_output_channels ${out_channels} --output_comm ${output_comm} \
-    --stride ${stride}
+    --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --share_policy --num_output_channels ${out_channels}
 done

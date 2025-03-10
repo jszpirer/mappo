@@ -85,9 +85,7 @@ class Runner(object):
         self.policy = []
         for agent_id in range(self.num_agents):
             share_observation_space = self.envs.share_observation_space[agent_id] if self.use_centralized_V else self.envs.observation_space[agent_id]
-            self.all_args.ID = agent_id
             # policy network
-            print("Creation de la policy d'un agent")
             po = Policy(self.all_args,
                         self.envs.observation_space[agent_id],
                         share_observation_space,
@@ -98,10 +96,14 @@ class Runner(object):
         if self.model_dir is not None:
             self.restore()
 
+        print("Creation of the trainer list")
         self.trainer = []
         self.buffer = []
+        print("Liste des args")
+        print(self.all_args)
+        print(type(self.all_args))
+        self.all_args.ID = 4
         for agent_id in range(self.num_agents):
-            
             # algorithm
             tr = TrainAlgo(self.all_args, self.policy[agent_id], device = self.device)
             # buffer

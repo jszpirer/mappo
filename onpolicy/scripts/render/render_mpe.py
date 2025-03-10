@@ -39,6 +39,10 @@ def parse_args(args, parser):
                         default=2, help="number of players")
     parser.add_argument("--grid_resolution", type=int, default=0)
     parser.add_argument("--nb_additional_data", type=int, default=0)
+    parser.add_argument("--wheel_noise", type=float, default=0)
+    parser.add_argument("--range_noise", type=float, default=0)
+    parser.add_argument("--output_comm", type=int, default=3)
+    parser.add_argument("--num_output_channels", type=int, default=1)
 
     all_args = parser.parse_known_args(args)[0]
 
