@@ -89,7 +89,8 @@ class MergedModel(nn.Module):
            input_size = 6 + output_comm + 2
            self.dim_actor = 1 + 6*mlp_args.grid_resolution
            if "goalcolor" in self.experiment_name:
-               if self.agent_ID == 1:
+               if self.agent_ID == 1 or obs_shape[0]/(self.dim_actor) > 1:
+                   print("Movable agent or critic")
                    self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride)
                    self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride)
                else:
@@ -104,7 +105,10 @@ class MergedModel(nn.Module):
        self.nb_additional_data = mlp_args.nb_additional_data
        
        if obs_shape[0]/(self.dim_actor) > 1:
-            input_size *= mlp_args.num_agents
+           if "goalcolor" in self.experiment_name:
+               input_size = 6 + output_comm + 2 + 3
+           else:
+               input_size *= mlp_args.num_agents
 
        self.mlp = MLPLayer(input_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
@@ -112,96 +116,144 @@ class MergedModel(nn.Module):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
 
-        for i in range(x.size()[1]//(self.dim_actor)):
-            if "simple_spread" in self.experiment_name:
-                tensor1 = x[:, i*self.dim_actor:self.nb_additional_data+i*self.dim_actor, :]
-    
-                result = tensor1[:, :, :2]
-                additional_data = result.reshape(result.shape[0], 2*self.nb_additional_data)
-                
-                tensor2 = x[:, self.nb_additional_data+i*self.dim_actor:self.grid_resolution+self.nb_additional_data+i*self.dim_actor, :]
-                tensor3 = x[:, self.grid_resolution+self.nb_additional_data+i*self.dim_actor:self.dim_actor+i*self.dim_actor, :]
-    
-                x1 = self.cnn1(tensor2)
-                x2 = self.cnn2(tensor3)
-                x_inter = cat((additional_data, x1, x2), dim=1)
-                x_inter_list.append(x_inter)
-            elif "goalcolor" in self.experiment_name:
-                if x.size()[1]//(self.dim_actor) > 1:
-                    print("test shared observations")
-                    print(x[0][193])
-                if self.agent_ID == 1:
-                    tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
-                    result = tensor1[:, :, :2]
-                    velocity = result.reshape(result.shape[0], 2)
-
-                    tensor2 = x[:, 1+i*self.dim_actor:3*self.grid_resolution+1+i*self.dim_actor, :]
-                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                    x2 = self.cnn1(reshaped_tensor)
-
-                    tensor3 = x[:, 3*self.grid_resolution+1+i*self.dim_actor:(i+1)*self.dim_actor, :]
-                    reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                    x3 = self.cnn2(reshaped_tensor)
-
-                    x_inter = cat((velocity, x2, x3), dim=1)
-                    x_inter_list.append(x_inter)
-                else:
-                    tensor2 = x[:, 1+i*self.dim_actor:3*self.grid_resolution+1+i*self.dim_actor, :]
-                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                    result = reshaped_tensor[:, :, 0, 0]
-                    goal_color = result.reshape(-1, 3)
-
-                    x_inter = goal_color
-                    x_inter_list.append(x_inter)
-            elif "goalcomm" in self.experiment_name:
-                tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
-                result = tensor1[:, :, :2]
-                velocity = result.reshape(result.shape[0], 2)
-
-                tensor2 = x[:, 1+i*self.dim_actor:97+i*self.dim_actor, :]
-                reshaped_tensor = tensor2.reshape(-1, 3, 32, 32)
+        if "goalcolor" in self.experiment_name:
+            print("Verif share_obs")
+            if x.size()[1]//(self.dim_actor) > 1:
+                tensor2 = x[:, 1:3*self.grid_resolution+1, :]
+                reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                 result = reshaped_tensor[:, :, 0, 0]
                 goal_color = result.reshape(-1, 3)
 
-                tensor3 = x[:, 97+i*self.dim_actor:(i+1)*self.dim_actor, :]
-                reshaped_tensor = tensor3.reshape(-1, 3, 32, 32)
-                x3 = self.cnn2(reshaped_tensor)
-
-                x_inter = cat((velocity, goal_color, x3), dim=1)
-                x_inter_list.append(x_inter)
-            elif "speaker" in self.experiment_name:
-                tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                tensor1 = x[:, self.dim_actor:1+self.dim_actor, :]
                 result = tensor1[:, :, :2]
                 velocity = result.reshape(result.shape[0], 2)
-
-                tensor2 = x[:, 1+i*self.dim_actor:97+i*self.dim_actor, :]
-                reshaped_tensor = tensor2.reshape(-1, 3, 32, 32)
+    
+                tensor2 = x[:, 1+self.dim_actor:3*self.grid_resolution+1+self.dim_actor, :]
+                reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                 x2 = self.cnn1(reshaped_tensor)
-
-                tensor3 = x[:, 97+i*self.dim_actor:(i+1)*self.dim_actor, :]
-                reshaped_tensor = tensor3.reshape(-1, 3, 32, 32)
+    
+                tensor3 = x[:, 3*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
+                reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                 x3 = self.cnn2(reshaped_tensor)
-
-                x_inter = cat((velocity, x2, x3), dim=1)
+    
+                x_inter = cat((goal_color, velocity, x2, x3), dim=1)
                 x_inter_list.append(x_inter)
             else:
-                tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
-                result = tensor1[:, :, :2]
-                velocity = result.reshape(result.shape[0], 2)
-
-                tensor2 = x[:, 1+i*self.dim_actor:2+i*self.dim_actor, :]
-                result = tensor2[:, :, :3]
-                color = result.reshape(result.shape[0], 3)
-
-                tensor3 = x[:, 2+i*self.dim_actor:3+i*self.dim_actor, :]
-                result = tensor3[:, :, :10]
-                comm = result.reshape(result.shape[0], 10)
-
-                tensor4 = x[:, 3+i*self.dim_actor:(i+1)*self.dim_actor, :]
-
-                x4 = self.cnn(tensor4)
-                x_inter = cat((velocity, color, comm, x4), dim=1)
-                x_inter_list.append(x_inter)
+                if self.agent_ID == 1:
+                    tensor1 = x[:, 0:1, :]
+                    result = tensor1[:, :, :2]
+                    velocity = result.reshape(result.shape[0], 2)
+    
+                    tensor2 = x[:, 1:3*self.grid_resolution+1, :]
+                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                    x2 = self.cnn1(reshaped_tensor)
+    
+                    tensor3 = x[:, 3*self.grid_resolution+1:1*self.dim_actor, :]
+                    reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                    x3 = self.cnn2(reshaped_tensor)
+    
+                    x_inter = cat((velocity, x2, x3), dim=1)
+                    x_inter_list.append(x_inter)
+                else:
+                    tensor2 = x[:, 1:3*self.grid_resolution+1, :]
+                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                    result = reshaped_tensor[:, :, 0, 0]
+                    goal_color = result.reshape(-1, 3)
+    
+                    x_inter = goal_color
+                    x_inter_list.append(x_inter)
+                    
+        else:
+            for i in range(x.size()[1]//(self.dim_actor)):
+                if "simple_spread" in self.experiment_name:
+                    tensor1 = x[:, i*self.dim_actor:self.nb_additional_data+i*self.dim_actor, :]
+        
+                    result = tensor1[:, :, :2]
+                    additional_data = result.reshape(result.shape[0], 2*self.nb_additional_data)
+                    
+                    tensor2 = x[:, self.nb_additional_data+i*self.dim_actor:self.grid_resolution+self.nb_additional_data+i*self.dim_actor, :]
+                    tensor3 = x[:, self.grid_resolution+self.nb_additional_data+i*self.dim_actor:self.dim_actor+i*self.dim_actor, :]
+        
+                    x1 = self.cnn1(tensor2)
+                    x2 = self.cnn2(tensor3)
+                    x_inter = cat((additional_data, x1, x2), dim=1)
+                    x_inter_list.append(x_inter)
+                elif "goalcolor" in self.experiment_name:
+                    if x.size()[1]//(self.dim_actor) > 1:
+                        print("test shared observations")
+                        print(x[0])
+                    if self.agent_ID == 1:
+                        tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                        result = tensor1[:, :, :2]
+                        velocity = result.reshape(result.shape[0], 2)
+    
+                        tensor2 = x[:, 1+i*self.dim_actor:3*self.grid_resolution+1+i*self.dim_actor, :]
+                        reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                        x2 = self.cnn1(reshaped_tensor)
+    
+                        tensor3 = x[:, 3*self.grid_resolution+1+i*self.dim_actor:(i+1)*self.dim_actor, :]
+                        reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                        x3 = self.cnn2(reshaped_tensor)
+    
+                        x_inter = cat((velocity, x2, x3), dim=1)
+                        x_inter_list.append(x_inter)
+                    else:
+                        tensor2 = x[:, 1+i*self.dim_actor:3*self.grid_resolution+1+i*self.dim_actor, :]
+                        reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                        result = reshaped_tensor[:, :, 0, 0]
+                        goal_color = result.reshape(-1, 3)
+    
+                        x_inter = goal_color
+                        x_inter_list.append(x_inter)
+                elif "goalcomm" in self.experiment_name:
+                    tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                    result = tensor1[:, :, :2]
+                    velocity = result.reshape(result.shape[0], 2)
+    
+                    tensor2 = x[:, 1+i*self.dim_actor:97+i*self.dim_actor, :]
+                    reshaped_tensor = tensor2.reshape(-1, 3, 32, 32)
+                    result = reshaped_tensor[:, :, 0, 0]
+                    goal_color = result.reshape(-1, 3)
+    
+                    tensor3 = x[:, 97+i*self.dim_actor:(i+1)*self.dim_actor, :]
+                    reshaped_tensor = tensor3.reshape(-1, 3, 32, 32)
+                    x3 = self.cnn2(reshaped_tensor)
+    
+                    x_inter = cat((velocity, goal_color, x3), dim=1)
+                    x_inter_list.append(x_inter)
+                elif "speaker" in self.experiment_name:
+                    tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                    result = tensor1[:, :, :2]
+                    velocity = result.reshape(result.shape[0], 2)
+    
+                    tensor2 = x[:, 1+i*self.dim_actor:97+i*self.dim_actor, :]
+                    reshaped_tensor = tensor2.reshape(-1, 3, 32, 32)
+                    x2 = self.cnn1(reshaped_tensor)
+    
+                    tensor3 = x[:, 97+i*self.dim_actor:(i+1)*self.dim_actor, :]
+                    reshaped_tensor = tensor3.reshape(-1, 3, 32, 32)
+                    x3 = self.cnn2(reshaped_tensor)
+    
+                    x_inter = cat((velocity, x2, x3), dim=1)
+                    x_inter_list.append(x_inter)
+                else:
+                    tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
+                    result = tensor1[:, :, :2]
+                    velocity = result.reshape(result.shape[0], 2)
+    
+                    tensor2 = x[:, 1+i*self.dim_actor:2+i*self.dim_actor, :]
+                    result = tensor2[:, :, :3]
+                    color = result.reshape(result.shape[0], 3)
+    
+                    tensor3 = x[:, 2+i*self.dim_actor:3+i*self.dim_actor, :]
+                    result = tensor3[:, :, :10]
+                    comm = result.reshape(result.shape[0], 10)
+    
+                    tensor4 = x[:, 3+i*self.dim_actor:(i+1)*self.dim_actor, :]
+    
+                    x4 = self.cnn(tensor4)
+                    x_inter = cat((velocity, color, comm, x4), dim=1)
+                    x_inter_list.append(x_inter)
         # Concatenate the output of the CNN with position and velocity
         x = cat(x_inter_list, dim=1)
         # Give x to the MLP
