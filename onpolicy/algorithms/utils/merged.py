@@ -1,18 +1,84 @@
 import torch.nn as nn
-from torch import cat
+from torch import cat, chunk
 from .util import init
 
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
 
+class SimpleCNN2(nn.Module):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, sigmoid=False):
+        super(SimpleCNN2, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=3, stride=1, groups=input_channels)
+        self.relu = nn.ReLU()
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=2, stride=1)
+        size = 7
+        self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3)
+        self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3)
+        self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        # flatten
+        x = x.view(x.size(0), -1)
+        # chunk the 1D vector to separate the colors
+        red, green, blue = chunk(x, 3, dim=1)
+        # dense layers
+        red_out = self.fc_red(red)
+        green_out = self.fc_green(green)
+        blue_out = self.fc_blue(blue)
+        # Concatenation of the colors
+        x = cat((red_out, green_out, blue_out), dim=1)
+        return x
+
+
+class SimpleCNN(nn.Module):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, sigmoid=False):
+        super(SimpleCNN, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels)
+        self.relu = nn.ReLU()
+        #self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+        #self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
+        size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
+        self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3)
+        self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3)
+        self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu(x)
+        # flatten
+        x = x.view(x.size(0), -1)
+        # chunk the 1D vector to separate the colors
+        red, green, blue = chunk(x, 3, dim=1)
+        # dense layers
+        red_out = self.fc_red(red)
+        green_out = self.fc_green(green)
+        blue_out = self.fc_blue(blue)
+        # Concatenation of the colors
+        x = cat((red_out, green_out, blue_out), dim=1)
+        return x
+
 class CNNLayer(nn.Module):
-    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, sigmoid=False):
         super(CNNLayer, self).__init__()
 
 
         #TODO: Maybe change the active_func
         active_func = nn.ReLU()
+        if sigmoid:
+            print("Sigmoid for comm")
+            last_active_func = nn.Sequential(nn.Sigmoid(), nn.Threshold(0.5, 0))
+        else:
+            last_active_func = nn.ReLU()
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][use_orthogonal]
         gain = nn.init.calculate_gain('relu')
         if input_channels > 1:
@@ -38,7 +104,7 @@ class CNNLayer(nn.Module):
             init_(nn.Linear(((input_width - kernel_size) // stride + 1) * ((input_height - kernel_size) // stride + 1) * output_channels,
                             output_size)
                   ),
-            active_func
+            last_active_func
         )
 
     def forward(self, x):
@@ -88,11 +154,25 @@ class MergedModel(nn.Module):
            nb_output_channels = mlp_args.num_output_channels
            input_size = 6 + output_comm + 2
            self.dim_actor = 1 + 6*mlp_args.grid_resolution
+           sigmoid = True if mlp_args.sigmoid==1 else False
            if "goalcolor" in self.experiment_name:
                if self.agent_ID == 1 or obs_shape[0]/(self.dim_actor) > 1:
                    print("Movable agent or critic")
-                   self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride)
-                   self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride)
+                   if "stepbystep" not in self.experiment_name:
+                       if "step1" not in self.experiment_name:
+                           if mlp_args.simpleCNN == 1:
+                               print("Simple for comm")
+                               self.cnn1 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride_comm,kernel_size=mlp_args.kernel_comm, sigmoid=False)
+                           elif mlp_args.simpleCNN2 == 1:
+                               self.cnn1 = SimpleCNN2((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride_comm,kernel_size=mlp_args.kernel_comm, sigmoid=False)
+                           else:
+                               self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride_comm,kernel_size=mlp_args.kernel_comm, sigmoid=True)
+                       if "step2" not in self.experiment_name:
+                           if mlp_args.simpleCNN == 1:
+                               print("Simple CNN")
+                               self.cnn2 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                           else:    
+                               self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride)
                else:
                    input_size = 3
            else:
@@ -116,8 +196,7 @@ class MergedModel(nn.Module):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
 
-        if "goalcolor" in self.experiment_name:
-            print("Verif share_obs")
+        if "step" in self.experiment_name:
             if x.size()[1]//(self.dim_actor) > 1:
                 tensor2 = x[:, 1:3*self.grid_resolution+1, :]
                 reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
@@ -126,7 +205,69 @@ class MergedModel(nn.Module):
 
                 tensor1 = x[:, self.dim_actor:1+self.dim_actor, :]
                 result = tensor1[:, :, :2]
-                velocity = result.reshape(result.shape[0], 2)
+                velocity = result.reshape(-1, 2)
+
+                tensor2 = x[:, 1+self.dim_actor:3*self.grid_resolution+1+self.dim_actor, :]
+                reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                if "step2" not in self.experiment_name:
+                    result = reshaped_tensor[:, :, 0, 0]
+                    x2 = result.reshape(-1, 3)
+                else:
+                    x2 = self.cnn1(reshaped_tensor)
+
+                tensor3 = x[:, 3*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
+                reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                if "step1" not in self.experiment_name:
+                    result = reshaped_tensor[:, :, 0, :2]
+                    x3 = result.reshape(-1, 6)
+                else:
+                    x3 = self.cnn2(reshaped_tensor)
+
+                x_inter = cat((goal_color, velocity, x2, x3), dim=1)
+                x_inter_list.append(x_inter)
+            else:
+                if self.agent_ID == 1:
+                    tensor1 = x[:, 0:1, :]
+                    result = tensor1[:, :, :2]
+                    velocity = result.reshape(result.shape[0], 2)
+
+                    tensor2 = x[:, 1:3*self.grid_resolution+1, :]
+                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                    if "step2" not in self.experiment_name:
+                        result = reshaped_tensor[:, :, 0, 0]
+                        x2 = result.reshape(-1, 3)
+                    else:
+                        x2 = self.cnn1(reshaped_tensor)
+
+                    tensor3 = x[:, 3*self.grid_resolution+1:1*self.dim_actor, :]
+                    reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                    if "step1" not in self.experiment_name:
+                        result = reshaped_tensor[:, :, 0, :2]
+                        x3 = result.reshape(-1, 6)
+                    else:
+                        x3 = self.cnn2(reshaped_tensor)
+
+                    x_inter = cat((velocity, x2, x3), dim=1)
+                    x_inter_list.append(x_inter)
+                else:
+                    tensor2 = x[:, 1:3*self.grid_resolution+1, :]
+                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                    result = reshaped_tensor[:, :, 0, 0]
+                    goal_color = result.reshape(-1, 3)
+
+                    x_inter = goal_color
+                    x_inter_list.append(x_inter)
+
+        elif "goalcolor" in self.experiment_name:
+            if x.size()[1]//(self.dim_actor) > 1:
+                tensor2 = x[:, 1:3*self.grid_resolution+1, :]
+                reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
+                result = reshaped_tensor[:, :, 0, 0]
+                goal_color = result.reshape(-1, 3)
+
+                tensor1 = x[:, self.dim_actor:1+self.dim_actor, :]
+                result = tensor1[:, :, :2]
+                velocity = result.reshape(-1, 2)
     
                 tensor2 = x[:, 1+self.dim_actor:3*self.grid_resolution+1+self.dim_actor, :]
                 reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)

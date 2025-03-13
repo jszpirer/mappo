@@ -63,6 +63,12 @@ def parse_args(args, parser):
     parser.add_argument("--num_output_channels", type=int, default=1)
     parser.add_argument("--different_CNNs", type=int, default=1)
     parser.add_argument("--stride", type=int, default=1)
+    parser.add_argument("--sigmoid", type=int, default=0)
+    parser.add_argument("--stride_comm", type=int, default=1)
+    parser.add_argument("--kernel_comm", type=int, default=2)
+    parser.add_argument("--simpleCNN", type=int, default=0)
+    parser.add_argument("--kernel", type=int, default=2)
+    parser.add_argument("--simpleCNN2", type=int, default=0)
 
     all_args = parser.parse_known_args(args)[0]
 
