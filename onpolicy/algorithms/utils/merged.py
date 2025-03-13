@@ -13,11 +13,12 @@ class SimpleCNN2(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=3, stride=1, groups=input_channels)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=2, stride=1)
+        self.conv2 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=2, stride=1, groups=input_channels)
         size = 7
         self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3)
         self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3)
         self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.conv1(x)
@@ -36,6 +37,7 @@ class SimpleCNN2(nn.Module):
         blue_out = self.fc_blue(blue)
         # Concatenation of the colors
         x = cat((red_out, green_out, blue_out), dim=1)
+        x = self.sigmoid(x)
         return x
 
 

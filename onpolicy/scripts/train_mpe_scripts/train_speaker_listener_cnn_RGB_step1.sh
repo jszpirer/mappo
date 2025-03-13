@@ -1,26 +1,26 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_speaker_listener_cnn_goalcolor_step2"
+scenario="simple_speaker_listener_cnn_goalcolor_step1"
 num_landmarks=3
 num_agents=2
-grid_resolution=32
+grid_resolution=48
 nb_additional_data=2
 out_channels=3
 output_comm=3
 stride_comm=1
 kernel_comm=32
-simpleCNN=0
-simpleCNN2=1
+simpleCNN=1
+simpleCNN2=0
 stride=1
-kernel=3
+kernel=4
 algo="mappo" #"rmappo" "ippo"
-exp="simple_speaker_listener_cnn_goalcolorfinalstep2CNN2sigmoid"
+exp="simple_speaker_listener_cnn_goalcolorfinalstep148kernel4"
 seed_max=5
 project="simple_speaker_listener_noise"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 #for seed in `seq ${seed_max}`;
-for seed in 2 1 3 5 6
+for seed in 1 2 3 5 6
 do
     echo "seed is ${seed}:"
     CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
