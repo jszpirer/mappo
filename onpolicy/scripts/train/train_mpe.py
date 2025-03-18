@@ -69,6 +69,8 @@ def parse_args(args, parser):
     parser.add_argument("--simpleCNN", type=int, default=0)
     parser.add_argument("--kernel", type=int, default=2)
     parser.add_argument("--simpleCNN2", type=int, default=0)
+    parser.add_argument("--simpleCNN3", type=int, default=0)
+    parser.add_argument("--simpleCNN4", type=int, default=0)
 
     all_args = parser.parse_known_args(args)[0]
 

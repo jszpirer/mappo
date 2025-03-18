@@ -1,5 +1,5 @@
 import torch.nn as nn
-from torch import cat, chunk
+from torch import cat, chunk, div, add, abs, max
 from .util import init
 
 class Flatten(nn.Module):
@@ -41,31 +41,34 @@ class SimpleCNN2(nn.Module):
         return x
 
 class SimpleCNN3(nn.Module):
-    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=4, output_channels=1, sigmoid=False):
-        super(SimpleCNN, self).__init__()
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=4, output_channels=1, sigmoid=True):
+        super(SimpleCNN3, self).__init__()
 
-        self.conv1_message1 = nn.Conv2d(in_channels=2, out_channels=32, kernel_size=kernel_size, stride=stride)
-        self.conv1_message2 = nn.Conv2d(in_channels=2, out_channels=32, kernel_size=kernel_size, stride=stride)
-        self.conv1_message3 = nn.Conv2d(in_channels=2, out_channels=32, kernel_size=kernel_size, stride=stride)
+        self.conv1_message1 = nn.Conv2d(in_channels=2, out_channels=1, kernel_size=kernel_size, stride=stride, bias=sigmoid)
+        self.conv1_message2 = nn.Conv2d(in_channels=2, out_channels=1, kernel_size=kernel_size, stride=stride, bias=sigmoid)
+        self.conv1_message3 = nn.Conv2d(in_channels=2, out_channels=1, kernel_size=kernel_size, stride=stride, bias=sigmoid)
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=1)
         self.relu = nn.ReLU()
         size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
-        self.fc_red = nn.Linear(in_features=size * size * 32, out_features=output_size // 3)
-        self.fc_green = nn.Linear(in_features=size * size * 32, out_features=output_size // 3)
-        self.fc_blue = nn.Linear(in_features=size * size * 32, out_features=output_size // 3)
+        size = (size - (2 - 1) - 1) // 1 + 1
+        self.fc_red = nn.Linear(in_features=size * size, out_features=output_size // 3, bias=sigmoid)
+        self.fc_green = nn.Linear(in_features=size * size, out_features=output_size // 3, bias=sigmoid)
+        self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size // 3, bias=sigmoid)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         messages = x[:, :3, :, :]  # Les trois premiers canaux pour les messages
         position = x[:, 3:, :, :]  # Le quatrième canal pour la position des robots
 
         # Concaténation du canal de position avec chaque canal de message
-        message1 = torch.cat((messages[:, 0:1, :, :], position), dim=1)
-        message2 = torch.cat((messages[:, 1:2, :, :], position), dim=1)
-        message3 = torch.cat((messages[:, 2:3, :, :], position), dim=1)
+        message1 = cat((messages[:, 0:1, :, :], position), dim=1)
+        message2 = cat((messages[:, 1:2, :, :], position), dim=1)
+        message3 = cat((messages[:, 2:3, :, :], position), dim=1)
 
         # Convolutions séparées
-        message1 = self.relu(self.conv1_message1(message1))
-        message2 = self.relu(self.conv1_message2(message2))
-        message3 = self.relu(self.conv1_message3(message3))
+        message1 = self.relu(self.maxpool(self.conv1_message1(message1)))
+        message2 = self.relu(self.maxpool(self.conv1_message2(message2)))
+        message3 = self.relu(self.maxpool(self.conv1_message3(message3)))
 
         # flatten
         message1 = message1.view(message1.size(0), -1)
@@ -78,22 +81,65 @@ class SimpleCNN3(nn.Module):
         blue_out = self.fc_blue(message3)
 
         # Concatenation des caractéristiques
-        x = torch.cat((red_out, green_out, blue_out), dim=1)
+        x = cat((red_out, green_out, blue_out), dim=1)
+        x = self.softmax(x)
         return x
 
 
 class SimpleCNN(nn.Module):
-    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, sigmoid=False):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, sigmoid=True):
         super(SimpleCNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels)
+        self.comm = not sigmoid
+        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels, bias = sigmoid)
         self.relu = nn.ReLU()
+        self.prelu = nn.PReLU()
+        self.tanh = nn.Tanh()
         #self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
         #self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
         size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
-        self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3)
-        self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3)
-        self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3)
+        self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3, bias = sigmoid)
+        self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3, bias = sigmoid)
+        self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3, bias=sigmoid)
+        self.sig = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        #if self.comm:
+            #x = self.prelu(x)
+        #else:
+        x = self.tanh(x)
+        # flatten
+        x = x.view(x.size(0), -1)
+        # chunk the 1D vector to separate the colors
+        red, green, blue = chunk(x, 3, dim=1)
+        # dense layers
+        red_out = self.fc_red(red)
+        green_out = self.fc_green(green)
+        blue_out = self.fc_blue(blue)
+        # Concatenation of the colors
+        if self.comm:
+            x = self.sig(cat((red_out, green_out, blue_out), dim=1))
+        else:
+            x = self.tanh(cat((red_out, green_out, blue_out), dim=1))
+        return x
+
+class SimpleCNN4(nn.Module):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, sigmoid=True):
+        super(SimpleCNN4, self).__init__()
+
+        self.comm = not sigmoid
+        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels, bias = sigmoid)
+        self.relu = nn.ReLU()
+        self.prelu = nn.PReLU()
+        self.tanh = nn.Tanh()
+        #self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+        #self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
+        size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
+        self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3, bias = sigmoid)
+        self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3, bias = sigmoid)
+        self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3, bias=sigmoid)
+        self.sig = nn.Sigmoid()
 
     def forward(self, x):
         x = self.conv1(x)
@@ -107,7 +153,13 @@ class SimpleCNN(nn.Module):
         green_out = self.fc_green(green)
         blue_out = self.fc_blue(blue)
         # Concatenation of the colors
-        x = cat((red_out, green_out, blue_out), dim=1)
+        if self.comm:
+            x = abs(cat((red_out, green_out, blue_out), dim=1))
+            max_values = max(x, dim=1).values
+            max_values = max_values.unsqueeze(1).repeat(1, 3)
+            x = div(x, add(max_values, 0.00000001))
+        else:
+            x = self.tanh(cat((red_out, green_out, blue_out), dim=1))
         return x
 
 class CNNLayer(nn.Module):
@@ -212,12 +264,14 @@ class MergedModel(nn.Module):
                                self.cnn1 = SimpleCNN2((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride_comm,kernel_size=mlp_args.kernel_comm, sigmoid=False)
                            elif mlp_args.simpleCNN3 == 1:
                                self.cnn1 = SimpleCNN3((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride_comm,kernel_size=mlp_args.kernel_comm, sigmoid=False)
+                           elif mlp_args.simpleCNN4 == 1:
+                               self.cnn1 = SimpleCNN4((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride_comm,kernel_size=mlp_args.kernel_comm, sigmoid=False)
                            else:
                                self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), output_comm, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride_comm,kernel_size=mlp_args.kernel_comm, sigmoid=True)
                        if "step2" not in self.experiment_name:
                            if mlp_args.simpleCNN == 1:
                                print("Simple CNN")
-                               self.cnn2 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                               self.cnn2 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride, kernel_size=mlp_args.kernel, sigmoid=True)
                            else:    
                                self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride)
                else:
