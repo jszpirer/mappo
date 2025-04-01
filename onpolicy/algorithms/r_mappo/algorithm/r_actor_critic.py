@@ -4,7 +4,6 @@ from onpolicy.algorithms.utils.util import init, check
 from onpolicy.algorithms.utils.cnn import CNNBase
 from onpolicy.algorithms.utils.mlp import MLPBase
 from onpolicy.algorithms.utils.merged import MergedModel
-from onpolicy.algorithms.utils.copilot_merged import CopilotMergedModel
 from onpolicy.algorithms.utils.rnn import RNNLayer
 from onpolicy.algorithms.utils.act import ACTLayer
 from onpolicy.algorithms.utils.popart import PopArt
@@ -36,10 +35,7 @@ class R_Actor(nn.Module):
         if len(obs_shape) == 3:
             base = CNNBase
         elif len(obs_shape) == 2:
-            if "copilotcnn" in args.experiment_name:
-                base = CopilotMergedModel
-            else:
-                base = MergedModel
+            base = MergedModel
         self.base = base(args, obs_shape)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
