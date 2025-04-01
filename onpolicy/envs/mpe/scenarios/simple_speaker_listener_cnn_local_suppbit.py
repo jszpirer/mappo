@@ -60,7 +60,7 @@ class Scenario(BaseScenario):
         # set random initial states
         for agent in world.agents:
             if agent.movable:
-                agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+                agent.state.p_pos = np.random.uniform(-3.85, +3.85, world.dim_p)
             else:
                 agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
@@ -91,31 +91,30 @@ class Scenario(BaseScenario):
 
         # Calculate positions of all entities in this agent's reference frame
         for i, entity in enumerate(world.landmarks):
-            distance = entity.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution / (world.limit * 4)
-            scale = (world.grid_resolution // 2) - 1
-            x = round(coef * distance[0]) + scale
-            y = round(coef * distance[1]) + scale
-            entity_positions[i][x][y] = 1
+            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= 3:
+                distance = entity.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution / (world.limit * 4)
+                scale = (world.grid_resolution // 2) - 1
+                x = round(coef * distance[0]) + scale
+                y = round(coef * distance[1]) + scale
+                entity_positions[i][x][y] = 1
 
         # communication of all other agents
-        comm = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.dim_c)]
+        comm = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.dim_c+1)]
         
         for other in world.agents:
             if other is agent or (other.state.c is None):
                 continue
+            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) > 3:
+                continue
+            comm[0][0][0] = 1
             indices = [index for index, value in enumerate(other.state.c) if value != 1]
-            distance = other.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution / (world.limit * 4)
-            scale = (world.grid_resolution // 2) - 1
-            x = round(coef * distance[0]) + scale
-            y = round(coef * distance[1]) + scale
             for index in indices:
-                comm[index][x][y] = 1
+                comm[index+1][0][0] = 1
 
         # speaker
         if not agent.movable:
-            observations = np.concatenate((np.array([np.zeros(world.grid_resolution)]), np.vstack(goal_color),  np.vstack(np.zeros((3, world.grid_resolution, world.grid_resolution)))), axis=0)
+            observations = np.concatenate((np.array([np.zeros(world.grid_resolution)]), np.vstack(goal_color),  np.vstack(np.zeros((4, world.grid_resolution, world.grid_resolution)))), axis=0)
             return observations
         # listener
         if agent.silent:
