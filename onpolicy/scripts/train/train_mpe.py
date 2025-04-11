@@ -63,6 +63,10 @@ def parse_args(args, parser):
     parser.add_argument("--num_output_channels", type=int, default=1)
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--kernel", type=int, default=2)
+    parser.add_argument("--output_entities", type=int, default=6)
+    parser.add_argument("--output_other", type=int, default=0)
+    parser.add_argument("--curriculum_start", type=int, default=0)
+    parser.add_argument("--obs_range", type=float, default=3)
 
     all_args = parser.parse_known_args(args)[0]
 

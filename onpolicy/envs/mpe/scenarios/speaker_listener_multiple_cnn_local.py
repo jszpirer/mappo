@@ -109,18 +109,21 @@ class Scenario(BaseScenario):
         entity_positions = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(3)]
         # Calculate positions of all entities in this agent's reference frame
         for i, entity in enumerate(world.landmarks):
-            distance = entity.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution / (world.limit * 4)
-            scale = (world.grid_resolution // 2) - 1
-            x = round(coef * distance[0]) + scale
-            y = round(coef * distance[1]) + scale
-            entity_positions[i%3][x][y] = 1
+            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= 3:
+                distance = entity.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution / (world.limit * 4)
+                scale = (world.grid_resolution // 2) - 1
+                x = round(coef * distance[0]) + scale
+                y = round(coef * distance[1]) + scale
+                entity_positions[i%3][x][y] = 1
 
         # Initialize other positions
         other_positions = np.zeros((world.grid_resolution, world.grid_resolution))
         # Calculate positions of all other listeners in this agent's reference frame
         for other in world.agents:
             if other.silent and not other is agent:
+                if np.linalg.norm(other.state.p_pos - agent.state.p_pos) > 3:
+                    continue
                 distance = other.state.p_pos - agent.state.p_pos
                 coef = world.grid_resolution / (world.limit * 4)
                 scale = (world.grid_resolution // 2) - 1
@@ -133,6 +136,8 @@ class Scenario(BaseScenario):
         
         for other in world.agents:
             if other is agent or (other.state.c is None):
+                continue
+            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) > 3:
                 continue
             indices = [index for index, value in enumerate(other.state.c) if value != 1]
             for index in indices:
