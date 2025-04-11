@@ -73,7 +73,7 @@ class MPERunner(Runner):
                                     idv_rews.append(infos[count][agent_id].get('individual_reward', 0))
                         train_infos[agent_id].update({'individual_rewards': np.mean(idv_rews)})
                         train_infos[agent_id].update({"average_episode_rewards": np.mean(self.buffer[agent_id].rewards) * self.episode_length})
-                self.log_train(train_infos, total_num_steps)
+                self.log_train(train_infos, total_num_steps + self.all_args.curriculum_start)
 
             # eval
             if episode % self.eval_interval == 0 and self.use_eval:
@@ -234,7 +234,7 @@ class MPERunner(Runner):
             eval_train_infos.append({'eval_average_episode_rewards': eval_average_episode_rewards})
             print("eval average episode rewards of agent%i: " % agent_id + str(eval_average_episode_rewards))
 
-        self.log_train(eval_train_infos, total_num_steps)  
+        self.log_train(eval_train_infos, total_num_steps + self.all_args.curriculum_start)  
 
     @torch.no_grad()
     def render(self):        

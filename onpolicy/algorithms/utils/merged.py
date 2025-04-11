@@ -1,39 +1,125 @@
 import torch.nn as nn
-from torch import cat, chunk, div, add, abs, max
+import spconv.pytorch as spconv
+from torch import cat, chunk, div, add, abs, max, int32
 from .util import init
 
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
 
-
-class SimpleCNN(nn.Module):
+class SimpleSparseCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
-        super(SimpleCNN, self).__init__()
+        super(SimpleSparseCNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels)
+        # Create separate convolutional layers for each channel
+        self.conv_red = spconv.SparseConv2d(
+            in_channels=1,
+            out_channels=output_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            bias=False
+        )
+        self.conv_green = spconv.SparseConv2d(
+            in_channels=1,
+            out_channels=output_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            bias=False
+        )
+        self.conv_blue = spconv.SparseConv2d(
+            in_channels=1,
+            out_channels=output_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            bias=False
+        )
         self.tanh = nn.Tanh()
         #print(use_ReLU)
         #self.final_activ = nn.ReLU() if use_ReLU else nn.Tanh()
         size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
+        self.output_channels = output_channels
         self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3)
         self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3)
         self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3)
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
+        # Split the input tensor into separate channels
+        red_channel = x[:, 0, :, :]
+        green_channel = x[:, 1, :, :]
+        blue_channel = x[:, 2, :, :]
+
+        # Convert each channel to a sparse tensor
+        red_indices = red_channel.nonzero(as_tuple=False).to(int32)
+        red_values = red_channel[red_channel != 0].unsqueeze(1)
+        red_sparse = spconv.SparseConvTensor(red_values, red_indices, spatial_shape=red_channel.shape[1:], batch_size=x.shape[0])
+
+        green_indices = green_channel.nonzero(as_tuple=False).to(int32)
+        green_values = green_channel[green_channel != 0].unsqueeze(1)
+        green_sparse = spconv.SparseConvTensor(green_values, green_indices, spatial_shape=green_channel.shape[1:], batch_size=x.shape[0])
+
+        blue_indices = blue_channel.nonzero(as_tuple=False).to(int32)
+        blue_values = blue_channel[blue_channel != 0].unsqueeze(1)
+        blue_sparse = spconv.SparseConvTensor(blue_values, blue_indices, spatial_shape=blue_channel.shape[1:], batch_size=x.shape[0])
+
+        # Apply convolutional layers to each sparse tensor
+        red_output = self.tanh(self.conv_red(red_sparse).dense())
+        green_output = self.tanh(self.conv_green(green_sparse).dense())
+        blue_output = self.tanh(self.conv_blue(blue_sparse).dense())
+
+        print(self.conv_red.weight)
+
+        # Flatten the outputs
+        red_flat = red_output.view(red_output.size(0), -1)
+        green_flat = green_output.view(green_output.size(0), -1)
+        blue_flat = blue_output.view(blue_output.size(0), -1)
+
+        # Pass the flattened outputs through the linear layers
+        red_out = self.fc_red(red_flat)
+        green_out = self.fc_green(green_flat)
+        blue_out = self.fc_blue(blue_flat)
+
+        # Concatenate the outputs of the linear layers
+        x = cat((red_out, green_out, blue_out), dim=1)
+
+        return self.tanh(x)
+
+class SimpleCNN(nn.Module):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
+        super(SimpleCNN, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels, bias=False)
+        self.tanh = nn.Tanh()
+        #print(use_ReLU)
+        #self.final_activ = nn.ReLU() if use_ReLU else nn.Tanh()
+        size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
+        self.output_channels = output_channels
+        if self.output_channels == 1:
+            self.fc = nn.Linear(in_features=size * size, out_features=output_size)
+        else:
+            self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3)
+            self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3)
+            self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3)
+        self.sig = nn.Sigmoid()
+
+    def forward(self, x):
         x = self.conv1(x)
         x = self.tanh(x)
+        print(self.conv1.weight)
         # flatten
         x = x.view(x.size(0), -1)
-        # chunk the 1D vector to separate the colors
-        red, green, blue = chunk(x, 3, dim=1)
-        # dense layers
-        red_out = self.fc_red(red)
-        green_out = self.fc_green(green)
-        blue_out = self.fc_blue(blue)
-        # Concatenation of the colors
-        x = self.tanh(cat((red_out, green_out, blue_out), dim=1))
+        if self.output_channels == 1:
+            out = self.fc(x)
+            x = self.tanh(out)
+        else:
+            # chunk the 1D vector to separate the colors
+            red, green, blue = chunk(x, 3, dim=1)
+            # dense layers
+            red_out = self.fc_red(red)
+            green_out = self.fc_green(green)
+            blue_out = self.fc_blue(blue)
+            # Concatenation of the colors
+            x = self.tanh(cat((red_out, green_out, blue_out), dim=1))
         return x
 
 class CNNLayer(nn.Module):
@@ -116,14 +202,30 @@ class MergedModel(nn.Module):
        elif "speaker" in self.experiment_name:
            self.agent_ID = mlp_args.ID
            output_comm = mlp_args.output_comm
+           output_entities = mlp_args.output_entities
+           output_other = mlp_args.output_other
            nb_output_channels = mlp_args.num_output_channels
-           input_size = 6 + output_comm + 2
+           input_size = output_entities + output_other + output_comm + 2
            print(input_size)
            self.dim_actor = 1 + (3+output_comm)*mlp_args.grid_resolution
-           if self.agent_ID == 1 or obs_shape[0]/(self.dim_actor) > 1:
+           if "multiple" in self.experiment_name:
+               self.dim_actor += mlp_args.grid_resolution
+           print("Sizes")
+           print(obs_shape[0])
+           print(self.dim_actor)
+           print(output_entities)
+           if self.agent_ID != 0 or obs_shape[0]/(self.dim_actor) > 1:
                print("Movable agent or critic")
-               self.cnn2 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 6, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+               if "sparse" in self.experiment_name:
+                   print("Sparse convolution")
+                   self.cnn2 = SimpleSparseCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), output_entities, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=1, output_channels=1, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+               else:
+                   self.cnn2 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), output_entities, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+               if "multiple" in self.experiment_name:
+                   print("Multiple case")
+                   self.cnn3 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), output_other, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=1, output_channels=1, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
            else:
+               print("Speaker")
                input_size = 3
        
        self.grid_resolution = mlp_args.grid_resolution
@@ -131,7 +233,7 @@ class MergedModel(nn.Module):
        
        if obs_shape[0]/(self.dim_actor) > 1:
            if "speaker" in self.experiment_name:
-               input_size = 6 + output_comm + 2 + 3
+               input_size = output_entities + output_comm + 2 + 3 + output_other
            else:
                input_size *= mlp_args.num_agents
 
@@ -161,7 +263,7 @@ class MergedModel(nn.Module):
                     reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                     result = reshaped_tensor[:, :, 0, 0]
                     x2 = result.reshape(-1, 3)
-                    tensor3 = x[:, 3*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
+                    tensor3 = x[:, 3*self.grid_resolution+1+self.dim_actor:6*self.grid_resolution+1+self.dim_actor, :]
                 else:
                     tensor2 = x[:, 1+self.dim_actor:4*self.grid_resolution+1+self.dim_actor, :]
                     reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
@@ -172,10 +274,17 @@ class MergedModel(nn.Module):
                 reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                 x3 = self.cnn2(reshaped_tensor)
 
-                x_inter = cat((goal_color, velocity, x2, x3), dim=1)
-                x_inter_list.append(x_inter)
+                if "multiple" in self.experiment_name:
+                    tensor4 = x[:, 6*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
+                    reshaped_tensor = tensor4.reshape(-1, 1, self.grid_resolution, self.grid_resolution)
+                    x4 = self.cnn3(reshaped_tensor)
+                    x_inter = cat((goal_color, velocity, x2, x3, x4), dim=1)
+                    x_inter_list.append(x_inter)
+                else:
+                    x_inter = cat((goal_color, velocity, x2, x3), dim=1)
+                    x_inter_list.append(x_inter)
             else:
-                if self.agent_ID == 1:
+                if self.agent_ID != 0:
                     tensor1 = x[:, 0:1, :]
                     result = tensor1[:, :, :2]
                     velocity = result.reshape(result.shape[0], 2)
@@ -185,7 +294,7 @@ class MergedModel(nn.Module):
                         reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                         result = reshaped_tensor[:, :, 0, 0]
                         x2 = result.reshape(-1, 3)
-                        tensor3 = x[:, 3*self.grid_resolution+1:self.dim_actor, :]
+                        tensor3 = x[:, 3*self.grid_resolution+1:6*self.grid_resolution+1, :]
                     else:
                         tensor2 = x[:, 1:4*self.grid_resolution+1, :]
                         reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
@@ -196,8 +305,15 @@ class MergedModel(nn.Module):
                     reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                     x3 = self.cnn2(reshaped_tensor)
 
-                    x_inter = cat((velocity, x2, x3), dim=1)
-                    x_inter_list.append(x_inter)
+                    if "multiple" in self.experiment_name:
+                        tensor4 = x[:, 6*self.grid_resolution+1:self.dim_actor, :]
+                        reshaped_tensor = tensor4.reshape(-1, 1, self.grid_resolution, self.grid_resolution)
+                        x4 = self.cnn3(reshaped_tensor)
+                        x_inter = cat((velocity, x2, x3, x4), dim=1)
+                        x_inter_list.append(x_inter)
+                    else:
+                        x_inter = cat((velocity, x2, x3), dim=1)
+                        x_inter_list.append(x_inter)
                 else:
                     tensor2 = x[:, 1:3*self.grid_resolution+1, :]
                     reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
