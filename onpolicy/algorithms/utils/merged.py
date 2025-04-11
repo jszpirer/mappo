@@ -50,7 +50,7 @@ class SimpleSparseCNN(nn.Module):
         # Extract features and indices from sparse tensor
         features = sparse_x.values()
         indices = sparse_x.indices().permute(1, 0).contiguous().int()
-        spatial_shape = sparse_x.shape[1:]
+        spatial_shape = sparse_x.shape[2:]
 
         # Split the features into three channels
         num_features = features.size(0) // 3
