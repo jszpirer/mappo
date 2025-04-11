@@ -88,7 +88,13 @@ class SimpleCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
         super(SimpleCNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels, bias=False)
+        #self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=input_channels, kernel_size=kernel_size, stride=stride, groups=input_channels, bias=False)
+        
+        #Separate convolutional layers for each channel
+        self.conv_red = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=kernel_size, stride=stride, bias=False)
+        self.conv_green = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=kernel_size, stride=stride, bias=False)
+        self.conv_blue = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=kernel_size, stride=stride, bias=False)
+
         self.tanh = nn.Tanh()
         #print(use_ReLU)
         #self.final_activ = nn.ReLU() if use_ReLU else nn.Tanh()
@@ -103,17 +109,37 @@ class SimpleCNN(nn.Module):
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.tanh(x)
-        print(self.conv1.weight)
+        #x = self.conv1(x)
+        #x = self.tanh(x)
+        #print(self.conv1.weight)
         # flatten
-        x = x.view(x.size(0), -1)
+        #x = x.view(x.size(0), -1)
+        
+        # Split the input into three channels
+        red, green, blue = chunk(x, 3, dim=1)
+
+        # Apply convolution to each channel
+        red = self.conv_red(red)
+        green = self.conv_green(green)
+        blue = self.conv_blue(blue)
+
+        # Apply activation function
+        red = self.tanh(red)
+        green = self.tanh(green)
+        blue = self.tanh(blue)
+
+        # Flatten each channel
+        red = red.view(red.size(0), -1)
+        green = green.view(green.size(0), -1)
+        blue = blue.view(blue.size(0), -1)
+
+
         if self.output_channels == 1:
             out = self.fc(x)
             x = self.tanh(out)
         else:
             # chunk the 1D vector to separate the colors
-            red, green, blue = chunk(x, 3, dim=1)
+            #red, green, blue = chunk(x, 3, dim=1)
             # dense layers
             red_out = self.fc_red(red)
             green_out = self.fc_green(green)
