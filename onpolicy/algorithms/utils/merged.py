@@ -45,23 +45,23 @@ class SimpleSparseCNN(nn.Module):
 
     def forward(self, x):
         # Convert x to a sparse tensor
-        sparse_x = x.to_sparse()
+        sparse_x = x.to_sparse()
 
-        # Extract features and indices from sparse tensor
-        features = sparse_x.values()
-        indices = sparse_x.indices().permute(1, 0).contiguous().int()
-        spatial_shape = sparse_x.shape[1:]
+        # Extract features and indices from sparse tensor
+        features = sparse_x.values()
+        indices = sparse_x.indices().permute(1, 0).contiguous().int()
+        spatial_shape = sparse_x.shape[1:]
 
-        # Split the features into three channels
-        num_features = features.size(0) // 3
-        red_features = features[:num_features]
-        green_features = features[num_features:2*num_features]
+        # Split the features into three channels
+        num_features = features.size(0) // 3
+        red_features = features[:num_features]
+        green_features = features[num_features:2*num_features]
         blue_features = features[2*num_features:]
 
-        # Create SparseConvTensors for each channel
-        red_tensor = spconv.SparseConvTensor(red_features, indices[:num_features], spatial_shape, batch_size=x.size(0))
-        green_tensor = spconv.SparseConvTensor(green_features, indices[num_features:2*num_features], spatial_shape, batch_size=x.size(0))
-        blue_tensor = spconv.SparseConvTensor(blue_features, indices[2*num_features:], spatial_shape, batch_size=x.size(0))
+        # Create SparseConvTensors for each channel
+        red_tensor = spconv.SparseConvTensor(red_features, indices[:num_features], spatial_shape, batch_size=x.size(0))
+        green_tensor = spconv.SparseConvTensor(green_features, indices[num_features:2*num_features], spatial_shape, batch_size=x.size(0))
+        blue_tensor = spconv.SparseConvTensor(blue_features, indices[2*num_features:], spatial_shape, batch_size=x.size(0))
 
         # Apply convolutional layers to each sparse tensor
         red_output = self.tanh(self.conv_red(red_tensor).dense())
