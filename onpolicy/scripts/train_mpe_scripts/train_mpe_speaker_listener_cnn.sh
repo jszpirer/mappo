@@ -11,7 +11,7 @@ stride=2
 kernel=7
 obs_range=12
 algo="mappo" #"rmappo" "ippo"
-exp="simple_speaker_listener_cnn_77_nobias_sparse"
+exp="simple_speaker_listener_cnn_77_nobias"
 seed_max=1
 project="simple_speaker_listener_normal_time"
 
