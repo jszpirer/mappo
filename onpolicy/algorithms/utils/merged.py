@@ -44,29 +44,28 @@ class SimpleSparseCNN(nn.Module):
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        # Convert x to a sparse tensor
-        sparse_x = x.to_sparse()
+        # Split the input tensor into separate channels
+        red_channel = x[:, 0, :, :]
+        green_channel = x[:, 1, :, :]
+        blue_channel = x[:, 2, :, :]
 
-        # Extract features and indices from sparse tensor
-        features = sparse_x.values()
-        indices = sparse_x.indices().permute(1, 0).contiguous().int()
-        spatial_shape = sparse_x.shape[2:]
+        # Convert each channel to a sparse tensor
+        red_indices = red_channel.nonzero(as_tuple=False).to(int32)
+        red_values = red_channel[red_channel != 0].unsqueeze(1)
+        red_sparse = spconv.SparseConvTensor(red_values, red_indices, spatial_shape=red_channel.shape[1:], batch_size=x.shape[0])
 
-        # Split the features into three channels
-        num_features = features.size(0) // 3
-        red_features = features[:num_features]
-        green_features = features[num_features:2*num_features]
-        blue_features = features[2*num_features:]
+        green_indices = green_channel.nonzero(as_tuple=False).to(int32)
+        green_values = green_channel[green_channel != 0].unsqueeze(1)
+        green_sparse = spconv.SparseConvTensor(green_values, green_indices, spatial_shape=green_channel.shape[1:], batch_size=x.shape[0])
 
-        # Create SparseConvTensors for each channel
-        red_tensor = spconv.SparseConvTensor(red_features, indices[:num_features], spatial_shape, batch_size=x.size(0))
-        green_tensor = spconv.SparseConvTensor(green_features, indices[num_features:2*num_features], spatial_shape, batch_size=x.size(0))
-        blue_tensor = spconv.SparseConvTensor(blue_features, indices[2*num_features:], spatial_shape, batch_size=x.size(0))
+        blue_indices = blue_channel.nonzero(as_tuple=False).to(int32)
+        blue_values = blue_channel[blue_channel != 0].unsqueeze(1)
+        blue_sparse = spconv.SparseConvTensor(blue_values, blue_indices, spatial_shape=blue_channel.shape[1:], batch_size=x.shape[0])
 
         # Apply convolutional layers to each sparse tensor
-        red_output = self.tanh(self.conv_red(red_tensor).dense())
-        green_output = self.tanh(self.conv_green(green_tensor).dense())
-        blue_output = self.tanh(self.conv_blue(blue_tensor).dense())
+        red_output = self.tanh(self.conv_red(red_sparse).dense())
+        green_output = self.tanh(self.conv_green(green_sparse).dense())
+        blue_output = self.tanh(self.conv_blue(blue_sparse).dense())
 
         print(self.conv_red.weight)
 
@@ -142,9 +141,9 @@ class SimpleCNN(nn.Module):
             # chunk the 1D vector to separate the colors
             #red, green, blue = chunk(x, 3, dim=1)
             # dense layers
-            red_out = self.fc_red(red)
-            green_out = self.fc_green(green)
-            blue_out = self.fc_blue(blue)
+            red_out = self.fc_red(red.to_sparse())
+            green_out = self.fc_green(green.to_sparse())
+            blue_out = self.fc_blue(blue.to_sparse())
             # Concatenation of the colors
             x = self.tanh(cat((red_out, green_out, blue_out), dim=1))
         return x
