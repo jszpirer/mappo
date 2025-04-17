@@ -4,6 +4,7 @@ import torch.nn as nn
 from onpolicy.utils.util import get_gard_norm, huber_loss, mse_loss
 from onpolicy.utils.valuenorm import ValueNorm
 from onpolicy.algorithms.utils.util import check
+import time
 
 class R_MAPPO():
     """
@@ -169,6 +170,7 @@ class R_MAPPO():
         return value_loss, critic_grad_norm, policy_loss, dist_entropy, actor_grad_norm, imp_weights
 
     def train(self, buffer, update_actor=True):
+        #start = time.time()
         """
         Perform a training update using minibatch GD.
         :param buffer: (SharedReplayBuffer) buffer containing training data.
@@ -221,6 +223,8 @@ class R_MAPPO():
         for k in train_info.keys():
             train_info[k] /= num_updates
  
+        #end = time.time()
+        #print(end - start)
         return train_info
 
     def prep_training(self):

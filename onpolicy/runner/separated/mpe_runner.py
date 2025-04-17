@@ -28,6 +28,7 @@ class MPERunner(Runner):
                 for agent_id in range(self.num_agents):
                     self.trainer[agent_id].policy.lr_decay(episode, episodes)
 
+            #start2 = time.time()
             for step in range(self.episode_length):
                 # Sample actions
                 values, actions, action_log_probs, rnn_states, rnn_states_critic, actions_env = self.collect(step)
@@ -43,6 +44,8 @@ class MPERunner(Runner):
             # compute return and update network
             self.compute()
             train_infos = self.train()
+            #end2 = time.time()
+            #print(end2 - start2)
             
             # post process
             total_num_steps = (episode + 1) * self.episode_length * self.n_rollout_threads

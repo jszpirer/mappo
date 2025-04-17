@@ -1,79 +1,209 @@
 import torch.nn as nn
 import spconv.pytorch as spconv
-from torch import cat, chunk, div, add, abs, max, int32
+from torch import cat, chunk, div, add, abs, max, int32, set_printoptions, inf, sparse_coo_tensor
 from .util import init
+import MinkowskiEngine as ME
 
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
-
+    
 class SimpleSparseCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
         super(SimpleSparseCNN, self).__init__()
 
         # Create separate convolutional layers for each channel
-        self.conv_red = spconv.SparseConv2d(
+        self.conv_red = ME.MinkowskiConvolution(
             in_channels=1,
             out_channels=output_channels,
             kernel_size=kernel_size,
             stride=stride,
-            bias=False
+            bias=False, 
+            dimension=2
         )
-        self.conv_green = spconv.SparseConv2d(
+        self.conv_green = ME.MinkowskiConvolution(
             in_channels=1,
             out_channels=output_channels,
             kernel_size=kernel_size,
             stride=stride,
-            bias=False
+            bias=False, 
+            dimension=2,
+            expand_coordinates=True
         )
-        self.conv_blue = spconv.SparseConv2d(
+        self.conv_blue = ME.MinkowskiConvolution(
             in_channels=1,
             out_channels=output_channels,
             kernel_size=kernel_size,
             stride=stride,
-            bias=False
+            bias=False, 
+            dimension=2,
+            expand_coordinates=True
         )
-        self.tanh = nn.Tanh()
-        #print(use_ReLU)
-        #self.final_activ = nn.ReLU() if use_ReLU else nn.Tanh()
-        size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
+        self.tanh = ME.MinkowskiTanh()
+        self.size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
         self.output_channels = output_channels
-        self.fc_red = nn.Linear(in_features=size * size, out_features=output_size//3)
-        self.fc_green = nn.Linear(in_features=size * size, out_features=output_size//3)
-        self.fc_blue = nn.Linear(in_features=size * size, out_features=output_size//3)
-        self.sig = nn.Sigmoid()
+        #self.fc_red = ME.MinkowskiLinear(1, output_size//3)
+        #self.fc_green = ME.MinkowskiLinear(1, output_size//3)
+        #self.fc_blue = ME.MinkowskiLinear(1, output_size//3)
+        self.fc_red = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
+        self.fc_green = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
+        self.fc_blue = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
+        self.tanhdense = nn.Tanh()
 
     def forward(self, x):
         # Split the input tensor into separate channels
         red_channel = x[:, 0, :, :]
         green_channel = x[:, 1, :, :]
         blue_channel = x[:, 2, :, :]
+        set_printoptions(threshold=inf)
+        
 
         # Convert each channel to a sparse tensor
-        red_indices = red_channel.nonzero(as_tuple=False).to(int32)
-        red_values = red_channel[red_channel != 0].unsqueeze(1)
-        red_sparse = spconv.SparseConvTensor(red_values, red_indices, spatial_shape=red_channel.shape[1:], batch_size=x.shape[0])
+        red_sparse = ME.SparseTensor(features=red_channel[red_channel != 0].unsqueeze(1), coordinates=red_channel.nonzero().to(int32).contiguous())
+        blue_sparse = ME.SparseTensor(features=blue_channel[blue_channel != 0].unsqueeze(1), coordinates=blue_channel.nonzero().to(int32).contiguous())
+        green_sparse = ME.SparseTensor(features=green_channel[green_channel != 0].unsqueeze(1), coordinates=green_channel.nonzero().to(int32).contiguous())
 
-        green_indices = green_channel.nonzero(as_tuple=False).to(int32)
-        green_values = green_channel[green_channel != 0].unsqueeze(1)
-        green_sparse = spconv.SparseConvTensor(green_values, green_indices, spatial_shape=green_channel.shape[1:], batch_size=x.shape[0])
-
-        blue_indices = blue_channel.nonzero(as_tuple=False).to(int32)
-        blue_values = blue_channel[blue_channel != 0].unsqueeze(1)
-        blue_sparse = spconv.SparseConvTensor(blue_values, blue_indices, spatial_shape=blue_channel.shape[1:], batch_size=x.shape[0])
-
+        print(red_sparse.coordinates)
         # Apply convolutional layers to each sparse tensor
-        red_output = self.tanh(self.conv_red(red_sparse).dense())
-        green_output = self.tanh(self.conv_green(green_sparse).dense())
-        blue_output = self.tanh(self.conv_blue(blue_sparse).dense())
+        red_output = self.tanh(self.conv_red(red_sparse))
+        green_output = self.tanh(self.conv_green(green_sparse))
+        blue_output = self.tanh(self.conv_blue(blue_sparse))
+    
 
-        print(self.conv_red.weight)
+        
+        coords = red_output.coordinates
+        print(coords)
+        new_coords = coords[:, :2].clone()
+        new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
+        red_output = ME.SparseTensor(features=red_output.features, coordinates=new_coords)
+        # Flatten the outputs
+        #red_flat = red_output.view(red_output.size(0), -1)
+        #green_flat = green_output.view(green_output.size(0), -1)
+        #blue_flat = blue_output.view(blue_output.size(0), -1)
+
+        # Pass the flattened outputs through the linear layers
+        red_out = self.fc_red(red_output)
+        green_out = self.fc_green(green_output)
+        blue_out = self.fc_blue(blue_output)
+
+        # Concatenate the outputs of the linear layers
+        x = cat((red_out.features, green_out.features, blue_out.features), dim=1)
+
+        return self.tanhdense(x)
+
+class SimpleOldSparseCNN(nn.Module):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
+        super(SimpleOldSparseCNN, self).__init__()
+
+        # Create separate convolutional layers for each channel
+        self.net_red = spconv.SparseSequential(
+            spconv.SparseConv2d(in_channels=1, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
+            nn.Tanh()
+        )
+        self.net_green = spconv.SparseSequential(
+            spconv.SparseConv2d(in_channels=1, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
+            nn.Tanh()
+        )
+        self.net_blue = spconv.SparseSequential(
+            spconv.SparseConv2d(in_channels=1, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
+            nn.Tanh()
+        )
+        #self.conv_green = spconv.SparseConv2d(
+            #in_channels=1,
+            #out_channels=output_channels,
+            #kernel_size=kernel_size,
+            #stride=stride,
+            #bias=False
+        #)
+        #self.conv_blue = spconv.SparseConv2d(
+            #in_channels=1,
+            #out_channels=output_channels,
+            #kernel_size=kernel_size,
+            #stride=stride,
+            #bias=False
+        #)
+        self.tanh = nn.Tanh()
+        #print(use_ReLU)
+        #self.final_activ = nn.ReLU() if use_ReLU else nn.Tanh()
+        self.size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
+        self.output_channels = output_channels
+        self.fc_red = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
+        self.fc_green = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
+        self.fc_blue = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
+        #self.sig = nn.Sigmoid()
+
+    def forward(self, x):
+        set_printoptions(threshold=inf)
+        # Split the input tensor into separate channels
+        red_channel = x[:, 0, :, :]
+        green_channel = x[:, 1, :, :]
+        blue_channel = x[:, 2, :, :]
+
+        # Convert each channel to a sparse tensor
+        red_sparse = red_channel.to_sparse()
+        red_indices = red_sparse.indices().permute(1, 0).contiguous().int()
+        red_values = red_sparse.values().view(-1, 1)
+        red_sparse = spconv.SparseConvTensor(red_values, red_indices, red_channel.shape[1:], batch_size = red_channel.shape[0])
+
+        green_sparse = green_channel.to_sparse()
+        green_indices = green_sparse.indices().permute(1, 0).contiguous().int()
+        green_values = green_sparse.values().view(-1, 1)
+        green_sparse = spconv.SparseConvTensor(green_values, green_indices, green_channel.shape[1:], batch_size = green_channel.shape[0])
+
+        blue_sparse = blue_channel.to_sparse()
+        blue_indices = blue_sparse.indices().permute(1, 0).contiguous().int()
+        blue_values = blue_sparse.values().view(-1, 1)
+        blue_sparse = spconv.SparseConvTensor(blue_values, blue_indices, blue_channel.shape[1:], batch_size = blue_channel.shape[0])
+
+        #print(red_sparse.batch_size)
+        #print(self.conv_red(red_sparse))
+        # Apply convolutional layers to each sparse tensor
+        red_output = self.net_red(red_sparse)
+        green_output = self.net_green(green_sparse)
+        blue_output = self.net_blue(blue_sparse)
+        #green_output = self.tanh(self.conv_green(green_sparse).dense())
+        #blue_output = self.tanh(self.conv_blue(blue_sparse).dense())
+
+        #print(self.conv_red(red_sparse).indices)
+        #print(red_output.shape)
+        coords = red_output.indices
+        new_coords = coords[:, :2].clone()
+        new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
+        red_output.indices = new_coords
+
+        coords = green_output.indices
+        new_coords = coords[:, :2].clone()
+        new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
+        green_output.indices = new_coords
+
+        coords = blue_output.indices
+        new_coords = coords[:, :2].clone()
+        new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
+        blue_output.indices = new_coords
 
         # Flatten the outputs
-        red_flat = red_output.view(red_output.size(0), -1)
-        green_flat = green_output.view(green_output.size(0), -1)
-        blue_flat = blue_output.view(blue_output.size(0), -1)
+        # red_flat = red_output.view(red_output.size(0), -1)
+        red_flat_indices = red_output.indices.permute(1, 0).contiguous().int()
+        red_flat_values = red_output.features.view(red_output.features.shape[0])
+        red_flat = sparse_coo_tensor(red_flat_indices, red_flat_values, size=(red_channel.shape[0], self.size*self.size))
+        
+        green_flat_indices = green_output.indices.permute(1, 0).contiguous().int()
+        green_flat_values = green_output.features.view(green_output.features.shape[0])
+        green_flat = sparse_coo_tensor(green_flat_indices, green_flat_values, size=(green_channel.shape[0], self.size*self.size))
 
+        blue_flat_indices = blue_output.indices.permute(1, 0).contiguous().int()
+        blue_flat_values = blue_output.features.view(blue_output.features.shape[0])
+        blue_flat = sparse_coo_tensor(blue_flat_indices, blue_flat_values, size=(blue_channel.shape[0], self.size*self.size))
+        
+        
+        #green_flat = green_output.view(green_output.size(0), -1)
+        #blue_flat = blue_output.view(blue_output.size(0), -1)
+
+        #red_flat = red_output.dense()[:, 0, :, :].view(red_channel.shape[0], -1).to_sparse()
+        #green_flat = green_output.dense()[:, 0, :, :].view(red_channel.shape[0], -1).to_sparse()
+        #blue_flat = blue_output.dense()[:, 0, :, :].view(red_channel.shape[0], -1).to_sparse()
+        
+        
         # Pass the flattened outputs through the linear layers
         red_out = self.fc_red(red_flat)
         green_out = self.fc_green(green_flat)
@@ -141,9 +271,12 @@ class SimpleCNN(nn.Module):
             # chunk the 1D vector to separate the colors
             #red, green, blue = chunk(x, 3, dim=1)
             # dense layers
-            red_out = self.fc_red(red.to_sparse())
-            green_out = self.fc_green(green.to_sparse())
-            blue_out = self.fc_blue(blue.to_sparse())
+            #red_out = self.fc_red(red.to_sparse())
+            #green_out = self.fc_green(green.to_sparse())
+            #blue_out = self.fc_blue(blue.to_sparse())
+            red_out = self.fc_red(red)
+            green_out = self.fc_green(green)
+            blue_out = self.fc_blue(blue)
             # Concatenation of the colors
             x = self.tanh(cat((red_out, green_out, blue_out), dim=1))
         return x
@@ -244,7 +377,7 @@ class MergedModel(nn.Module):
                print("Movable agent or critic")
                if "sparse" in self.experiment_name:
                    print("Sparse convolution")
-                   self.cnn2 = SimpleSparseCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), output_entities, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=1, output_channels=1, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                   self.cnn2 = SimpleOldSparseCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), output_entities, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=1, output_channels=1, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                else:
                    self.cnn2 = SimpleCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), output_entities, mlp_args.use_orthogonal, mlp_args.use_ReLU, input_channels=3, output_channels=nb_output_channels, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                if "multiple" in self.experiment_name:
