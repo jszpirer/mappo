@@ -149,7 +149,10 @@ class Runner(object):
         factor = np.ones((self.episode_length, self.n_rollout_threads, 1), dtype=np.float32)
 
         for agent_id in torch.randperm(self.num_agents):
+            #start = time.time()
             self.trainer[agent_id].prep_training()
+            #end = time.time()
+            #print(end-start)        
             self.buffer[agent_id].update_factor(factor)
             available_actions = None if self.buffer[agent_id].available_actions is None \
                 else self.buffer[agent_id].available_actions[:-1].reshape(-1, *self.buffer[agent_id].available_actions.shape[2:])
