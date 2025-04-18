@@ -87,7 +87,9 @@ class Scenario(BaseScenario):
               goal_color[i][0][0] = agent.goal_b.color[i]
 
         # Initialize entity positions
-        entity_positions = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.num_landmarks)]
+        x_list = []
+        y_list = []
+        values = []
 
         # Calculate positions of all entities in this agent's reference frame
         for i, entity in enumerate(world.landmarks):
@@ -96,6 +98,7 @@ class Scenario(BaseScenario):
             scale = (world.grid_resolution // 2) - 1 + world.grid_resolution%2
             x = round(coef * distance[0]) + scale
             y = round(coef * distance[1]) + scale
+            
             entity_positions[i][x][y] = 1
 
         # communication of all other agents
