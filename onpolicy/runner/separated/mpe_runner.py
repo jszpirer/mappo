@@ -89,13 +89,13 @@ class MPERunner(Runner):
         share_obs = []
         for o in obs:
             share_obs.append(list(chain(*o)))
-        share_obs = np.array(share_obs)
 
         for agent_id in range(self.num_agents):
             if not self.use_centralized_V:
                 share_obs = np.array(list(obs[:, agent_id]))
             self.buffer[agent_id].share_obs[0] = share_obs.copy()
-            self.buffer[agent_id].obs[0] = np.array(list(obs[:, agent_id])).copy()
+            agent_obs = [obs[i][agent_id] for i in range(len(obs))]
+            self.buffer[agent_id].obs[0] = agent_obs.copy()
 
     @torch.no_grad()
     def collect(self, step):

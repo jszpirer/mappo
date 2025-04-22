@@ -2,9 +2,20 @@ import numpy as np
 import math
 import torch
 
-def check(input):
-    if type(input) == np.ndarray:
-        return torch.from_numpy(input)
+def new_check(input):
+    print("In check function")
+    # Assuming the input is a list of sparse Tensors, we can create a big batched sparse Tensor
+    # Concatenate the sparse tensors along a new dimension (batch dimension)
+    batch_indices = torch.cat([tensor.indices() for tensor in input], dim=1)
+    batch_values = torch.cat([tensor.values() for tensor in input])
+    batch_size = (len(input), *input[0].size())
+
+    # Create the batch sparse tensor
+    batch_sparse_tensor = torch.sparse_coo_tensor(batch_indices, batch_values, batch_size)
+
+    print(batch_sparse_tensor)
+
+    return batch_sparse_tensor
         
 def get_gard_norm(it):
     sum_grad = 0

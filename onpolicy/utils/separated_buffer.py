@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from collections import defaultdict
-from .util import check, get_shape_from_obs_space, get_shape_from_act_space
+from .util import get_shape_from_obs_space, get_shape_from_act_space
 
 def _flatten(T, N, x):
     return x.reshape(T * N, *x.shape[2:])
@@ -31,8 +31,8 @@ class SeparatedReplayBuffer(object):
         if type(share_obs_shape[-1]) == list:
             share_obs_shape = share_obs_shape[:1]
 
-        self.share_obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, *share_obs_shape), dtype=np.float32)
-        self.obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, *obs_shape), dtype=np.float32)
+        self.share_obs = [[[] for _ in range(self.n_rollout_threads)] for _ in range(self.episode_length + 1)]
+        self.obs = [[[] for _ in range(self.n_rollout_threads)] for _ in range(self.episode_length + 1)]
 
         self.rnn_states = np.zeros((self.episode_length + 1, self.n_rollout_threads, self.recurrent_N, self.rnn_hidden_size), dtype=np.float32)
         self.rnn_states_critic = np.zeros_like(self.rnn_states)

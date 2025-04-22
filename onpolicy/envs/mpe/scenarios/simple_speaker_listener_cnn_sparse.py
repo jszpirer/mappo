@@ -93,7 +93,7 @@ class Scenario(BaseScenario):
                 values_goal_color.append(agent.goal_b.color[i])
         
         # Create one-dimensional sparse tensor for goal_color
-        sparse_tensor_goal_color = torch.sparse_coo_tensor(torch.tensor([indices_goal_color]), torch.tensor(values_goal_color), size=(len(agent.goal_b.color),))
+        sparse_tensor_goal_color = torch.sparse_coo_tensor(torch.tensor([indices_goal_color]), torch.tensor(values_goal_color), size=(3,)).coalesce()
 
         # Initialize lists for sparse tensor indices and values
         indices_red = [[], []]
@@ -127,9 +127,9 @@ class Scenario(BaseScenario):
                 values_green.append(1)
         
         # Create sparse tensors
-        sparse_tensor_red = torch.sparse_coo_tensor(torch.tensor(indices_red), torch.tensor(values_red), size=(world.grid_resolution, world.grid_resolution))
-        sparse_tensor_blue = torch.sparse_coo_tensor(torch.tensor(indices_blue), torch.tensor(values_blue), size=(world.grid_resolution, world.grid_resolution))
-        sparse_tensor_green = torch.sparse_coo_tensor(torch.tensor(indices_green), torch.tensor(values_green), size=(world.grid_resolution, world.grid_resolution))
+        sparse_tensor_red = torch.sparse_coo_tensor(torch.tensor(indices_red), torch.tensor(values_red), size=(world.grid_resolution, world.grid_resolution)).coalesce()
+        sparse_tensor_blue = torch.sparse_coo_tensor(torch.tensor(indices_blue), torch.tensor(values_blue), size=(world.grid_resolution, world.grid_resolution)).coalesce()
+        sparse_tensor_green = torch.sparse_coo_tensor(torch.tensor(indices_green), torch.tensor(values_green), size=(world.grid_resolution, world.grid_resolution)).coalesce()
 
         # Initialize lists for sparse tensor indices and values for communication
         indices_comm = []
@@ -145,7 +145,7 @@ class Scenario(BaseScenario):
                 values_comm.append(1)
         
         # Create one-dimensional sparse tensor for communication
-        sparse_tensor_comm = torch.sparse_coo_tensor(torch.tensor([indices_comm]), torch.tensor(values_comm), size=(world.dim_c,))
+        sparse_tensor_comm = torch.sparse_coo_tensor(torch.tensor([indices_comm]), torch.tensor(values_comm), size=(world.dim_c,)).coalesce()
 
 
         # speaker
@@ -154,6 +154,6 @@ class Scenario(BaseScenario):
             return observations
         # listener
         if agent.silent:
-            sparse_tensor_vel = torch.sparse_coo_tensor(torch_tensor([[0, 1]]), torch.tensor(agent.state.p_vel), size=(2,))
+            sparse_tensor_vel = torch.sparse_coo_tensor(torch.tensor([[0, 1]]), torch.tensor(agent.state.p_vel), size=(2,)).coalesce()
             observations = [sparse_tensor_vel, sparse_tensor_red, sparse_tensor_blue, sparse_tensor_green, sparse_tensor_comm]
             return observations

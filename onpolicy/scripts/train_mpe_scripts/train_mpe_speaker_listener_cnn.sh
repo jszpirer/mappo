@@ -1,6 +1,6 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_speaker_listener_cnn"
+scenario="simple_speaker_listener_cnn_sparse"
 num_landmarks=3
 num_agents=2
 grid_resolution=77
