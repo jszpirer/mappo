@@ -265,15 +265,10 @@ class MergedModel(nn.Module):
            output_other = mlp_args.output_other
            nb_output_channels = mlp_args.num_output_channels
            input_size = output_entities + output_other + output_comm + 2
-           print(input_size)
-           self.dim_actor = 1 + (3+output_comm)*mlp_args.grid_resolution
+           self.dim_actor = 5
            if "multiple" in self.experiment_name:
                self.dim_actor += mlp_args.grid_resolution
-           print("Sizes")
-           print(obs_shape[0])
-           print(self.dim_actor)
-           print(output_entities)
-           if self.agent_ID != 0 or obs_shape[0]/(self.dim_actor) > 1:
+           if self.agent_ID != 0 or obs_shape[0]/(self.dim_actor) >= 1:
                print("Movable agent or critic")
                if "sparse" in self.experiment_name:
                    print("Sparse convolution")
@@ -305,9 +300,12 @@ class MergedModel(nn.Module):
     def forward(self, x):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
+        print("In the forward function")
+        print(x.size())
 
         if "speaker" in self.experiment_name:
-            if x.size()[1]//(self.dim_actor) > 1:
+            # First, need to differentiate the critic and the actor
+            if x.size()[1]//(self.dim_actor) > 1:                
                 tensor2 = x[:, 1:3*self.grid_resolution+1, :]
                 reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                 result = reshaped_tensor[:, :, 0, 0]
@@ -317,18 +315,11 @@ class MergedModel(nn.Module):
                 result = tensor1[:, :, :2]
                 velocity = result.reshape(-1, 2)
 
-                if "suppbit" not in self.experiment_name:
-                    tensor2 = x[:, 1+self.dim_actor:3*self.grid_resolution+1+self.dim_actor, :]
-                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                    result = reshaped_tensor[:, :, 0, 0]
-                    x2 = result.reshape(-1, 3)
-                    tensor3 = x[:, 3*self.grid_resolution+1+self.dim_actor:6*self.grid_resolution+1+self.dim_actor, :]
-                else:
-                    tensor2 = x[:, 1+self.dim_actor:4*self.grid_resolution+1+self.dim_actor, :]
-                    reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
-                    result = reshaped_tensor[:, :, 0, 0]
-                    x2 = result.reshape(-1, 4)
-                    tensor3 = x[:, 4*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
+                tensor2 = x[:, 1+self.dim_actor:4*self.grid_resolution+1+self.dim_actor, :]
+                reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
+                result = reshaped_tensor[:, :, 0, 0]
+                x2 = result.reshape(-1, 4)
+                tensor3 = x[:, 4*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
 
                 reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                 x3 = self.cnn2(reshaped_tensor)
@@ -343,23 +334,17 @@ class MergedModel(nn.Module):
                     x_inter = cat((goal_color, velocity, x2, x3), dim=1)
                     x_inter_list.append(x_inter)
             else:
+                # Then, need to differentiate the listener and the speaker
                 if self.agent_ID != 0:
                     tensor1 = x[:, 0:1, :]
                     result = tensor1[:, :, :2]
                     velocity = result.reshape(result.shape[0], 2)
 
-                    if "suppbit" not in self.experiment_name:
-                        tensor2 = x[:, 1:3*self.grid_resolution+1, :]
-                        reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                        result = reshaped_tensor[:, :, 0, 0]
-                        x2 = result.reshape(-1, 3)
-                        tensor3 = x[:, 3*self.grid_resolution+1:6*self.grid_resolution+1, :]
-                    else:
-                        tensor2 = x[:, 1:4*self.grid_resolution+1, :]
-                        reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
-                        result = reshaped_tensor[:, :, 0, 0]
-                        x2 = result.reshape(-1, 4)
-                        tensor3 = x[:, 4*self.grid_resolution+1:self.dim_actor, :]
+                    tensor2 = x[:, 1:4*self.grid_resolution+1, :]
+                    reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
+                    result = reshaped_tensor[:, :, 0, 0]
+                    x2 = result.reshape(-1, 4)
+                    tensor3 = x[:, 4*self.grid_resolution+1:self.dim_actor, :]
 
                     reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
                     x3 = self.cnn2(reshaped_tensor)

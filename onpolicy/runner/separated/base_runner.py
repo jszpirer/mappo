@@ -94,6 +94,7 @@ class Runner(object):
                         device = self.device)
             self.policy.append(po)
 
+        print("Policies are created")
         if self.model_dir is not None:
             self.restore()
 

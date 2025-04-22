@@ -14,18 +14,36 @@ def get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
 def check(input):
-    print(input)
-    # Assuming the input is a list of sparse Tensors, we can create a big batched sparse Tensor
-    # Concatenate the sparse tensors along a new dimension (batch dimension)
-    batch_indices = torch.cat([tensor.indices() for tensor in input], dim=1)
-    print([tensor.indices() for tensor in input])
-    batch_values = torch.cat([tensor.values() for tensor in input])
-    size = (*input[0].size(),)
-    print(size)
+    if type(input) == np.ndarray:
+        return torch.from_numpy(input)
+    # Flatten the list of lists
+    flattened_sparse_tensors = input
+
+    # Initialize lists to store batch indices and tensor indices
+    batch_indices_list = []
+    tensor_indices_list = []
+
+    # Iterate through the flattened sparse tensors to create batch indices
+    for batch_idx, tensor in enumerate(flattened_sparse_tensors):
+        tensor_indices = tensor.indices()
+        batch_indices = torch.full((1, tensor_indices.size(1)), batch_idx, dtype=torch.long)
+        batch_indices_list.append(batch_indices)
+        tensor_indices_list.append(tensor_indices)
+
+    # Concatenate batch indices and tensor indices
+    batch_indices = torch.cat(batch_indices_list, dim=1)
+    tensor_indices = torch.cat(tensor_indices_list, dim=1)
+
+    # Combine batch indices with tensor indices
+    combined_indices = torch.cat([batch_indices, tensor_indices], dim=0)
+
+    # Concatenate values from each sparse tensor
+    batch_values = torch.cat([tensor.values() for tensor in flattened_sparse_tensors])
+
+    # Determine the batch size
+    batch_size = (len(flattened_sparse_tensors), *flattened_sparse_tensors[0].size())
 
     # Create the batch sparse tensor
-    batch_sparse_tensor = torch.sparse_coo_tensor(batch_indices, batch_values, (len(input), *input[0].size(),))
-
-    print(batch_sparse_tensor)
+    batch_sparse_tensor = torch.sparse_coo_tensor(combined_indices, batch_values, batch_size)
 
     return batch_sparse_tensor

@@ -31,11 +31,9 @@ class R_Actor(nn.Module):
         self.tpdv = dict(dtype=torch.float32, device=device)
 
         obs_shape = get_shape_from_obs_space(obs_space)
-        base = MLPBase
-        if len(obs_shape) == 3:
-            base = CNNBase
-        elif len(obs_shape) == 2:
-            base = MergedModel
+        print("Len de obs_shape")
+        print(obs_shape)
+        base = MergedModel
         self.base = base(args, obs_shape)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
@@ -61,9 +59,7 @@ class R_Actor(nn.Module):
         :return action_log_probs: (torch.Tensor) log probabilities of taken actions.
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
-        print(obs)
-        obs = check([sparse_tensor[0] for sparse_tensor in obs])
-        print(obs)
+        obs = check([sparse_tensor[0] for sparse_tensor in obs]).to(**self.tpdv)
         rnn_states = check(rnn_states).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
         if available_actions is not None:
@@ -145,14 +141,7 @@ class R_Critic(nn.Module):
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][self._use_orthogonal]
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
-        base = MLPBase
-        if len(cent_obs_shape) == 3:
-            base = CNNBase
-        elif len(cent_obs_shape) == 2:
-            if "copilotcnn" in args.experiment_name:
-                base = CopilotMergedModel
-            else:
-                base = MergedModel
+        base = MergedModel
         self.base = base(args, cent_obs_shape)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
