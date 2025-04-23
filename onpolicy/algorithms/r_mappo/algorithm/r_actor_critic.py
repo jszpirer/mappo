@@ -31,8 +31,6 @@ class R_Actor(nn.Module):
         self.tpdv = dict(dtype=torch.float32, device=device)
 
         obs_shape = get_shape_from_obs_space(obs_space)
-        print("Len de obs_shape")
-        print(obs_shape)
         base = MergedModel
         self.base = base(args, obs_shape)
 
@@ -59,13 +57,16 @@ class R_Actor(nn.Module):
         :return action_log_probs: (torch.Tensor) log probabilities of taken actions.
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
-        obs = check([sparse_tensor[0] for sparse_tensor in obs]).to(**self.tpdv)
+        list_obs = []
+        for i in range(len(obs[0])):
+            obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs]).to(**self.tpdv)
+            list_obs.append(obs_to_add)
         rnn_states = check(rnn_states).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
         if available_actions is not None:
             available_actions = check(available_actions).to(**self.tpdv)
 
-        actor_features = self.base(obs)
+        actor_features = self.base(list_obs)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
@@ -167,11 +168,14 @@ class R_Critic(nn.Module):
         :return values: (torch.Tensor) value function predictions.
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
-        cent_obs = check(cent_obs).to(**self.tpdv)
+        list_cent_obs = []
+        for i in range(len(cent_obs[0])):
+            cent_obs_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs]).to(**self.tpdv)
+            list_cent_obs.append(cent_obs_to_add)
         rnn_states = check(rnn_states).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
 
-        critic_features = self.base(cent_obs)
+        critic_features = self.base(list_cent_obs)
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             critic_features, rnn_states = self.rnn(critic_features, rnn_states, masks)
         values = self.v_out(critic_features)

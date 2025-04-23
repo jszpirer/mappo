@@ -163,14 +163,13 @@ class MPERunner(Runner):
         share_obs = []
         for o in obs:
             share_obs.append(list(chain(*o)))
-        share_obs = np.array(share_obs)
 
         for agent_id in range(self.num_agents):
             if not self.use_centralized_V:
                 share_obs = np.array(list(obs[:, agent_id]))
 
             self.buffer[agent_id].insert(share_obs,
-                                        np.array(list(obs[:, agent_id])),
+                                        [obs[i][agent_id] for i in range(len(obs))],
                                         rnn_states[:, agent_id],
                                         rnn_states_critic[:, agent_id],
                                         actions[:, agent_id],

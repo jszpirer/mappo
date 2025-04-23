@@ -34,26 +34,22 @@ class SimpleOldSparseCNN(nn.Module):
 
     def forward(self, x):
         set_printoptions(threshold=inf)
-        # Split the input tensor into separate channels
-        red_channel = x[:, 0, :, :]
-        green_channel = x[:, 1, :, :]
-        blue_channel = x[:, 2, :, :]
 
         # Convert each channel to a sparse tensor
-        red_sparse = red_channel.to_sparse()
-        red_indices = red_sparse.indices().permute(1, 0).contiguous().int()
-        red_values = red_sparse.values().view(-1, 1)
-        red_sparse = spconv.SparseConvTensor(red_values, red_indices, red_channel.shape[1:], batch_size = red_channel.shape[0])
+        red_sparse = x[0]
+        red_indices = red_sparse.coalesce().indices().permute(1, 0).contiguous().int()
+        red_values = red_sparse.coalesce().values().view(-1, 1)
+        red_sparse = spconv.SparseConvTensor(red_values, red_indices, x[0].size()[1:], batch_size = x[0].size()[0])
 
-        green_sparse = green_channel.to_sparse()
-        green_indices = green_sparse.indices().permute(1, 0).contiguous().int()
-        green_values = green_sparse.values().view(-1, 1)
-        green_sparse = spconv.SparseConvTensor(green_values, green_indices, green_channel.shape[1:], batch_size = green_channel.shape[0])
+        green_sparse = x[1]
+        green_indices = green_sparse.coalesce().indices().permute(1, 0).contiguous().int()
+        green_values = green_sparse.coalesce().values().view(-1, 1)
+        green_sparse = spconv.SparseConvTensor(green_values, green_indices, x[0].size()[1:], batch_size = x[0].size()[0])
 
-        blue_sparse = blue_channel.to_sparse()
-        blue_indices = blue_sparse.indices().permute(1, 0).contiguous().int()
-        blue_values = blue_sparse.values().view(-1, 1)
-        blue_sparse = spconv.SparseConvTensor(blue_values, blue_indices, blue_channel.shape[1:], batch_size = blue_channel.shape[0])
+        blue_sparse = x[2]
+        blue_indices = blue_sparse.coalesce().indices().permute(1, 0).contiguous().int()
+        blue_values = blue_sparse.coalesce().values().view(-1, 1)
+        blue_sparse = spconv.SparseConvTensor(blue_values, blue_indices, x[0].size()[1:], batch_size = x[0].size()[0])
 
         #print(red_sparse.batch_size)
         #print(self.conv_red(red_sparse))
@@ -85,23 +81,15 @@ class SimpleOldSparseCNN(nn.Module):
         # red_flat = red_output.view(red_output.size(0), -1)
         red_flat_indices = red_output.indices.permute(1, 0).contiguous().int()
         red_flat_values = red_output.features.view(red_output.features.shape[0])
-        red_flat = sparse_coo_tensor(red_flat_indices, red_flat_values, size=(red_channel.shape[0], self.size*self.size))
+        red_flat = sparse_coo_tensor(red_flat_indices, red_flat_values, size=(x[0].size()[0], self.size*self.size))
         
         green_flat_indices = green_output.indices.permute(1, 0).contiguous().int()
         green_flat_values = green_output.features.view(green_output.features.shape[0])
-        green_flat = sparse_coo_tensor(green_flat_indices, green_flat_values, size=(green_channel.shape[0], self.size*self.size))
+        green_flat = sparse_coo_tensor(green_flat_indices, green_flat_values, size=(x[0].size()[0], self.size*self.size))
 
         blue_flat_indices = blue_output.indices.permute(1, 0).contiguous().int()
         blue_flat_values = blue_output.features.view(blue_output.features.shape[0])
-        blue_flat = sparse_coo_tensor(blue_flat_indices, blue_flat_values, size=(blue_channel.shape[0], self.size*self.size))
-        
-        
-        #green_flat = green_output.view(green_output.size(0), -1)
-        #blue_flat = blue_output.view(blue_output.size(0), -1)
-
-        #red_flat = red_output.dense()[:, 0, :, :].view(red_channel.shape[0], -1).to_sparse()
-        #green_flat = green_output.dense()[:, 0, :, :].view(red_channel.shape[0], -1).to_sparse()
-        #blue_flat = blue_output.dense()[:, 0, :, :].view(red_channel.shape[0], -1).to_sparse()
+        blue_flat = sparse_coo_tensor(blue_flat_indices, blue_flat_values, size=(x[0].size()[0], self.size*self.size))
         
         
         # Pass the flattened outputs through the linear layers
@@ -301,28 +289,19 @@ class MergedModel(nn.Module):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
         print("In the forward function")
-        print(x.size())
+        print(len(x))
 
         if "speaker" in self.experiment_name:
             # First, need to differentiate the critic and the actor
-            if x.size()[1]//(self.dim_actor) > 1:                
-                tensor2 = x[:, 1:3*self.grid_resolution+1, :]
-                reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                result = reshaped_tensor[:, :, 0, 0]
-                goal_color = result.reshape(-1, 3)
+            if len(x) > (self.dim_actor):                
+                print("critic")
+                goal_color = x[0].to_dense()
 
-                tensor1 = x[:, self.dim_actor:1+self.dim_actor, :]
-                result = tensor1[:, :, :2]
-                velocity = result.reshape(-1, 2)
+                velocity = x[1].to_dense()
 
-                tensor2 = x[:, 1+self.dim_actor:4*self.grid_resolution+1+self.dim_actor, :]
-                reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
-                result = reshaped_tensor[:, :, 0, 0]
-                x2 = result.reshape(-1, 4)
-                tensor3 = x[:, 4*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
+                x2 = x[5].to_dense()
 
-                reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                x3 = self.cnn2(reshaped_tensor)
+                x3 = self.cnn2([x[2], x[3], x[4]])
 
                 if "multiple" in self.experiment_name:
                     tensor4 = x[:, 6*self.grid_resolution+1+self.dim_actor:2*self.dim_actor, :]
@@ -336,18 +315,11 @@ class MergedModel(nn.Module):
             else:
                 # Then, need to differentiate the listener and the speaker
                 if self.agent_ID != 0:
-                    tensor1 = x[:, 0:1, :]
-                    result = tensor1[:, :, :2]
-                    velocity = result.reshape(result.shape[0], 2)
+                    velocity = x[0].to_dense()
 
-                    tensor2 = x[:, 1:4*self.grid_resolution+1, :]
-                    reshaped_tensor = tensor2.reshape(-1, 4, self.grid_resolution, self.grid_resolution)
-                    result = reshaped_tensor[:, :, 0, 0]
-                    x2 = result.reshape(-1, 4)
-                    tensor3 = x[:, 4*self.grid_resolution+1:self.dim_actor, :]
+                    x2 = x[4].to_dense()
 
-                    reshaped_tensor = tensor3.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                    x3 = self.cnn2(reshaped_tensor)
+                    x3 = self.cnn2([x[1], x[2], x[3]])
 
                     if "multiple" in self.experiment_name:
                         tensor4 = x[:, 6*self.grid_resolution+1:self.dim_actor, :]
@@ -359,11 +331,7 @@ class MergedModel(nn.Module):
                         x_inter = cat((velocity, x2, x3), dim=1)
                         x_inter_list.append(x_inter)
                 else:
-                    tensor2 = x[:, 1:3*self.grid_resolution+1, :]
-                    reshaped_tensor = tensor2.reshape(-1, 3, self.grid_resolution, self.grid_resolution)
-                    result = reshaped_tensor[:, :, 0, 0]
-                    goal_color = result.reshape(-1, 3)
-
+                    goal_color = x[0].to_dense()
                     x_inter = goal_color
                     x_inter_list.append(x_inter)
                     

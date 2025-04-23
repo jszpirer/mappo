@@ -10,6 +10,7 @@ import torch
 from onpolicy.config import get_config
 from onpolicy.envs.mpe.MPE_env import MPEEnv
 from onpolicy.envs.env_wrappers import SubprocVecEnv, DummyVecEnv
+import multiprocessing as mp
 
 """Train script for MPEs."""
 
@@ -187,4 +188,5 @@ def main(args):
 
 
 if __name__ == "__main__":
+    mp.set_start_method('spawn')
     main(sys.argv[1:])
