@@ -165,7 +165,10 @@ class Runner(object):
                                                             available_actions,
                                                             self.buffer[agent_id].active_masks[:-1].reshape(-1, *self.buffer[agent_id].active_masks.shape[2:]))
             else:
-                old_actions_logprob, _ =self.trainer[agent_id].policy.actor.evaluate_actions(self.buffer[agent_id].obs[:-1].reshape(-1, *self.buffer[agent_id].obs.shape[2:]),
+                concatenated_obs = np.concatenate(self.buffer[agent_id].obs[:-1], axis=0)
+                reshaped_obs = concatenated_obs.reshape(-1, *self.buffer[agent_id].obs[0].shape[2:])
+
+                old_actions_logprob, _ =self.trainer[agent_id].policy.actor.evaluate_actions(reshaped_obs,
                                                             self.buffer[agent_id].rnn_states[0:1].reshape(-1, *self.buffer[agent_id].rnn_states.shape[2:]),
                                                             self.buffer[agent_id].actions.reshape(-1, *self.buffer[agent_id].actions.shape[2:]),
                                                             self.buffer[agent_id].masks[:-1].reshape(-1, *self.buffer[agent_id].masks.shape[2:]),
