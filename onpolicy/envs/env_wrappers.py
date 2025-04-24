@@ -263,7 +263,7 @@ class SubprocVecEnv(ShareVecEnv):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
         obs, rews, dones, infos = zip(*results)
-        return np.stack(obs), np.stack(rews), np.stack(dones), infos
+        return np.array(obs, dtype=object), np.stack(rews), np.stack(dones), infos
 
     def reset(self):
         for remote in self.remotes:
@@ -273,10 +273,10 @@ class SubprocVecEnv(ShareVecEnv):
         print(len(obs[0]))
         print(obs[0][0].shape)
         print(obs[0][1].shape)
-        stacked = np.stack(obs)
+        stacked = np.array(obs, dtype=object)
         print("Shape after stack")
         print(stacked.shape)
-        return np.stack(obs)
+        return stacked
 
 
     def reset_task(self):

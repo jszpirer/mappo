@@ -89,7 +89,7 @@ class MPERunner(Runner):
         share_obs = []
         for o in obs:
             share_obs.append(list(chain(*o)))
-        share_obs = np.array(share_obs)
+        share_obs = np.array(share_obs, dtype=object)
 
         for agent_id in range(self.num_agents):
             if not self.use_centralized_V:
@@ -163,7 +163,7 @@ class MPERunner(Runner):
         share_obs = []
         for o in obs:
             share_obs.append(list(chain(*o)))
-        share_obs = np.array(share_obs)
+        share_obs = np.array(share_obs, dtype=object)
 
         for agent_id in range(self.num_agents):
             if not self.use_centralized_V:

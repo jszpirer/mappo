@@ -81,13 +81,17 @@ class Scenario(BaseScenario):
 
     def observation(self, agent, world):
         # goal color
-        goal_color = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.num_landmarks)]
+        goal_color = np.zeros(world.dim_color)
         if agent.goal_b is not None:
-            for i in range(len(agent.goal_b.color)):
-              goal_color[i][0][0] = agent.goal_b.color[i]
+            goal_color = agent.goal_b.color
 
         # Initialize entity positions
-        entity_positions = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.num_landmarks)]
+        indices_red = np.zeros((2, world.num_landmarks//3))
+        r = 0
+        indices_blue = np.zeros((2, world.num_landmarks//3))
+        b = 0
+        indices_green = np.zeros((2, world.num_landmarks//3))
+        g = 0
 
         # Calculate positions of all entities in this agent's reference frame
         for i, entity in enumerate(world.landmarks):
@@ -96,24 +100,34 @@ class Scenario(BaseScenario):
             scale = (world.grid_resolution // 2) - 1 + world.grid_resolution%2
             x = round(coef * distance[0]) + scale
             y = round(coef * distance[1]) + scale
-            entity_positions[i][x][y] = 1
+            # Determine color based on index
+            color_index = i % 3
+            if color_index == 0:
+                indices_red[0][r] = x
+                indices_red[1][r] = y
+                r += 1
+            elif color_index == 1:
+                indices_blue[0][b] = x
+                indices_blue[1][b] = y
+                b += 1
+            elif color_index == 2:
+                indices_green[0][g] = x
+                indices_green[1][g] = y
+                g += 1
 
         # communication of all other agents
-        comm = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.dim_c)]
+        comm = np.zeros(world.dim_c)
         
         for other in world.agents:
             if other is agent or (other.state.c is None):
                 continue
-            indices = [index for index, value in enumerate(other.state.c) if value != 1]
-            for index in indices:
-                comm[index][0][0] = 1
+            comm = other.state.c
 
         # speaker
         if not agent.movable:
-            observations = np.concatenate((np.array([np.zeros(world.grid_resolution)]), np.vstack(goal_color),  np.vstack(np.zeros((3, world.grid_resolution, world.grid_resolution)))), axis=0)
+            observations = np.array([goal_color], dtype=object)
             return observations
         # listener
         if agent.silent:
-            vel = [np.pad(agent.state.p_vel, (0, world.grid_resolution-2), 'constant', constant_values = 0)]
-            observations = np.concatenate((np.array(vel), np.vstack(comm), np.vstack(entity_positions)), axis=0)
+            observations = np.array([agent.state.p_vel, indices_red, indices_blue, indices_green, comm], dtype=object)
             return observations

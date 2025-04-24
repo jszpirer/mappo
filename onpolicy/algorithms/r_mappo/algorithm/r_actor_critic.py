@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from onpolicy.algorithms.utils.util import init, check
 from onpolicy.algorithms.utils.cnn import CNNBase
 from onpolicy.algorithms.utils.mlp import MLPBase
@@ -31,11 +32,7 @@ class R_Actor(nn.Module):
         self.tpdv = dict(dtype=torch.float32, device=device)
 
         obs_shape = get_shape_from_obs_space(obs_space)
-        base = MLPBase
-        if len(obs_shape) == 3:
-            base = CNNBase
-        elif len(obs_shape) == 2:
-            base = MergedModel
+        base = MergedModel
         self.base = base(args, obs_shape)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
@@ -61,13 +58,17 @@ class R_Actor(nn.Module):
         :return action_log_probs: (torch.Tensor) log probabilities of taken actions.
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
-        obs = check(obs).to(**self.tpdv)
+        list_obs = []
+        print(len(obs[0]))
+        for i in range(len(obs[0])):
+            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs]).to(**self.tpdv)
+            list_obs.append(obs_to_add)
         rnn_states = check(rnn_states).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
         if available_actions is not None:
             available_actions = check(available_actions).to(**self.tpdv)
 
-        actor_features = self.base(obs)
+        actor_features = self.base(list_obs)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
@@ -90,7 +91,11 @@ class R_Actor(nn.Module):
         :return action_log_probs: (torch.Tensor) log probabilities of the input actions.
         :return dist_entropy: (torch.Tensor) action distribution entropy for the given inputs.
         """
-        obs = check(obs).to(**self.tpdv)
+        list_obs = []
+        print(len(obs))
+        for i in range(len(obs[0])):
+            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs]).to(**self.tpdv)
+            list_obs.append(obs_to_add)
         rnn_states = check(rnn_states).to(**self.tpdv)
         action = check(action).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
@@ -100,7 +105,7 @@ class R_Actor(nn.Module):
         if active_masks is not None:
             active_masks = check(active_masks).to(**self.tpdv)
 
-        actor_features = self.base(obs)
+        actor_features = self.base(list_obs)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
@@ -143,14 +148,7 @@ class R_Critic(nn.Module):
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][self._use_orthogonal]
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
-        base = MLPBase
-        if len(cent_obs_shape) == 3:
-            base = CNNBase
-        elif len(cent_obs_shape) == 2:
-            if "copilotcnn" in args.experiment_name:
-                base = CopilotMergedModel
-            else:
-                base = MergedModel
+        base = MergedModel
         self.base = base(args, cent_obs_shape)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
@@ -176,11 +174,14 @@ class R_Critic(nn.Module):
         :return values: (torch.Tensor) value function predictions.
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
-        cent_obs = check(cent_obs).to(**self.tpdv)
+        list_cent_obs = []
+        for i in range(len(cent_obs[0])):
+            cent_obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in cent_obs]).to(**self.tpdv)
+            list_cent_obs.append(cent_obs_to_add)
         rnn_states = check(rnn_states).to(**self.tpdv)
         masks = check(masks).to(**self.tpdv)
 
-        critic_features = self.base(cent_obs)
+        critic_features = self.base(list_cent_obs)
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             critic_features, rnn_states = self.rnn(critic_features, rnn_states, masks)
         values = self.v_out(critic_features)
