@@ -1,6 +1,6 @@
 import torch.nn as nn
 import spconv.pytorch as spconv
-from torch import cat, chunk, div, add, abs, max, int32, set_printoptions, inf, sparse_coo_tensor
+from torch import cat, chunk, int32, set_printoptions, inf, sparse_coo_tensor
 from .util import init
 import MinkowskiEngine as ME
 
