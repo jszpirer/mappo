@@ -59,7 +59,6 @@ class R_Actor(nn.Module):
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
         list_obs = []
-        print(len(obs[0]))
         for i in range(len(obs[0])):
             obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs]).to(**self.tpdv)
             list_obs.append(obs_to_add)
@@ -92,7 +91,6 @@ class R_Actor(nn.Module):
         :return dist_entropy: (torch.Tensor) action distribution entropy for the given inputs.
         """
         list_obs = []
-        print(len(obs))
         for i in range(len(obs[0])):
             obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs]).to(**self.tpdv)
             list_obs.append(obs_to_add)

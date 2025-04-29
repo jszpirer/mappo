@@ -1,6 +1,7 @@
 import numpy as np
 from onpolicy.envs.mpe.core import World, Agent, Landmark
 from onpolicy.envs.mpe.scenario import BaseScenario
+# import torch
 
 
 class Scenario(BaseScenario):
@@ -80,40 +81,79 @@ class Scenario(BaseScenario):
         return -dist2
 
     def observation(self, agent, world):
-        # goal color
-        goal_color = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.num_landmarks)]
+        # Initialize lists for sparse tensor indices and values for goal_color
+        indices_goal_color = []
+        values_goal_color = []
+        
+        # Check if agent has a goal
         if agent.goal_b is not None:
             for i in range(len(agent.goal_b.color)):
-              goal_color[i][0][0] = agent.goal_b.color[i]
+                # Set the position for each color in goal_color
+                indices_goal_color.append(i)
+                values_goal_color.append(agent.goal_b.color[i])
+        
+        # Create one-dimensional sparse tensor for goal_color
+        sparse_tensor_goal_color = torch.sparse_coo_tensor(torch.tensor([indices_goal_color]), torch.tensor(values_goal_color), size=(3,)).to(device='cuda')
 
-        # Initialize entity positions
-        entity_positions = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.num_landmarks)]
-
+        # Initialize lists for sparse tensor indices and values
+        indices_red = [[], []]
+        indices_blue = [[], []]
+        indices_green = [[], []]
+        values_red = []
+        values_blue = []
+        values_green = []
+        
         # Calculate positions of all entities in this agent's reference frame
         for i, entity in enumerate(world.landmarks):
             distance = entity.state.p_pos - agent.state.p_pos
             coef = world.grid_resolution / (world.limit * 4)
-            scale = (world.grid_resolution // 2) - 1 + world.grid_resolution%2
+            scale = (world.grid_resolution // 2) - 1 + world.grid_resolution % 2
             x = round(coef * distance[0]) + scale
             y = round(coef * distance[1]) + scale
-            entity_positions[i][x][y] = 1
-
-        # communication of all other agents
-        comm = [np.zeros((world.grid_resolution, world.grid_resolution)) for _ in range(world.dim_c)]
+            
+            # Determine color based on index
+            color_index = i % 3
+            if color_index == 0:
+                indices_red[0].append(x)
+                indices_red[1].append(y)
+                values_red.append(1)
+            elif color_index == 1:
+                indices_blue[0].append(x)
+                indices_blue[1].append(y)
+                values_blue.append(1)
+            elif color_index == 2:
+                indices_green[0].append(x)
+                indices_green[1].append(y)
+                values_green.append(1)
         
+        # Create sparse tensors
+        sparse_tensor_red = torch.sparse_coo_tensor(torch.tensor(indices_red), torch.tensor(values_red), size=(world.grid_resolution, world.grid_resolution)).to(device='cuda')
+        sparse_tensor_blue = torch.sparse_coo_tensor(torch.tensor(indices_blue), torch.tensor(values_blue), size=(world.grid_resolution, world.grid_resolution)).to(device='cuda')
+        sparse_tensor_green = torch.sparse_coo_tensor(torch.tensor(indices_green), torch.tensor(values_green), size=(world.grid_resolution, world.grid_resolution)).to(device='cuda')
+
+        # Initialize lists for sparse tensor indices and values for communication
+        indices_comm = []
+        values_comm = []
+        
+        # Calculate communication states of all other agents
         for other in world.agents:
             if other is agent or (other.state.c is None):
                 continue
             indices = [index for index, value in enumerate(other.state.c) if value != 1]
             for index in indices:
-                comm[index][0][0] = 1
+                indices_comm.append(index)
+                values_comm.append(1)
+        
+        # Create one-dimensional sparse tensor for communication
+        sparse_tensor_comm = torch.sparse_coo_tensor(torch.tensor([indices_comm]), torch.tensor(values_comm), size=(world.dim_c,)).to(device='cuda')
+
 
         # speaker
         if not agent.movable:
-            observations = np.concatenate((np.array([np.zeros(world.grid_resolution)]), np.vstack(goal_color),  np.vstack(np.zeros((3, world.grid_resolution, world.grid_resolution)))), axis=0)
+            observations = [sparse_tensor_goal_color]
             return observations
         # listener
         if agent.silent:
-            vel = [np.pad(agent.state.p_vel, (0, world.grid_resolution-2), 'constant', constant_values = 0)]
-            observations = np.concatenate((np.array(vel), np.vstack(comm), np.vstack(entity_positions)), axis=0)
+            sparse_tensor_vel = torch.sparse_coo_tensor(torch.tensor([[0, 1]]), torch.tensor(agent.state.p_vel), size=(2,)).to(device='cuda')
+            observations = [sparse_tensor_vel, sparse_tensor_red, sparse_tensor_blue, sparse_tensor_green, sparse_tensor_comm]
             return observations

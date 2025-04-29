@@ -1,95 +1,58 @@
 import torch.nn as nn
 import spconv.pytorch as spconv
-from torch import cat, chunk, div, add, abs, max, int32, set_printoptions, inf, sparse_coo_tensor
+from torch import cat, chunk, set_printoptions, inf, sparse_coo_tensor
 from .util import init
 import MinkowskiEngine as ME
 
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
-    
-class SimpleSparseCNN(nn.Module):
+
+
+class SimplSparseSpreadCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
-        super(SimpleSparseCNN, self).__init__()
+        super(SimplSparseSpreadCNN, self).__init__()
 
         # Create separate convolutional layers for each channel
-        self.conv_red = ME.MinkowskiConvolution(
-            in_channels=1,
-            out_channels=output_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            bias=False, 
-            dimension=2
+        self.net = spconv.SparseSequential(
+            spconv.SparseConv2d(in_channels=1, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
+            nn.Tanh()
         )
-        self.conv_green = ME.MinkowskiConvolution(
-            in_channels=1,
-            out_channels=output_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            bias=False, 
-            dimension=2,
-            expand_coordinates=True
-        )
-        self.conv_blue = ME.MinkowskiConvolution(
-            in_channels=1,
-            out_channels=output_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            bias=False, 
-            dimension=2,
-            expand_coordinates=True
-        )
-        self.tanh = ME.MinkowskiTanh()
-        self.size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
-        self.output_channels = output_channels
-        #self.fc_red = ME.MinkowskiLinear(1, output_size//3)
-        #self.fc_green = ME.MinkowskiLinear(1, output_size//3)
-        #self.fc_blue = ME.MinkowskiLinear(1, output_size//3)
-        self.fc_red = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
-        self.fc_green = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
-        self.fc_blue = nn.Linear(in_features=self.size * self.size, out_features=output_size//3)
-        self.tanhdense = nn.Tanh()
+        self.tanh = nn.Tanh()
+        input_width = obs_shape[0]
+        input_height = obs_shape[1]
+        self.size = ((input_width - kernel_size) // stride + 1)
+        print("La size est")
+        print(self.size)
+        self.fc = nn.Linear(in_features=self.size * self.size, out_features=output_size)
 
     def forward(self, x):
-        # Split the input tensor into separate channels
-        red_channel = x[:, 0, :, :]
-        green_channel = x[:, 1, :, :]
-        blue_channel = x[:, 2, :, :]
         set_printoptions(threshold=inf)
-        
 
-        # Convert each channel to a sparse tensor
-        red_sparse = ME.SparseTensor(features=red_channel[red_channel != 0].unsqueeze(1), coordinates=red_channel.nonzero().to(int32).contiguous())
-        blue_sparse = ME.SparseTensor(features=blue_channel[blue_channel != 0].unsqueeze(1), coordinates=blue_channel.nonzero().to(int32).contiguous())
-        green_sparse = ME.SparseTensor(features=green_channel[green_channel != 0].unsqueeze(1), coordinates=green_channel.nonzero().to(int32).contiguous())
+        sparse = x
+        indices = sparse.coalesce().indices().permute(1, 0).contiguous().int()
+        values = sparse.coalesce().values().view(-1, 1)
+        sparse = spconv.SparseConvTensor(values, indices, x.size()[1:], batch_size = x.size()[0])
 
-        print(red_sparse.coordinates)
         # Apply convolutional layers to each sparse tensor
-        red_output = self.tanh(self.conv_red(red_sparse))
-        green_output = self.tanh(self.conv_green(green_sparse))
-        blue_output = self.tanh(self.conv_blue(blue_sparse))
-    
+        output = self.net(sparse)
 
-        
-        coords = red_output.coordinates
-        print(coords)
+        coords = output.indices
         new_coords = coords[:, :2].clone()
         new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
-        red_output = ME.SparseTensor(features=red_output.features, coordinates=new_coords)
+        output.indices = new_coords
+
         # Flatten the outputs
-        #red_flat = red_output.view(red_output.size(0), -1)
-        #green_flat = green_output.view(green_output.size(0), -1)
-        #blue_flat = blue_output.view(blue_output.size(0), -1)
+        flat_indices = output.indices.permute(1, 0).contiguous().int()
+        flat_values = output.features.view(output.features.shape[0])
+        flat = sparse_coo_tensor(flat_indices, flat_values, size=(x[0].size()[0], self.size*self.size))
 
         # Pass the flattened outputs through the linear layers
-        red_out = self.fc_red(red_output)
-        green_out = self.fc_green(green_output)
-        blue_out = self.fc_blue(blue_output)
+        x = self.fc(flat)
 
-        # Concatenate the outputs of the linear layers
-        x = cat((red_out.features, green_out.features, blue_out.features), dim=1)
+        return self.tanh(x)
 
-        return self.tanhdense(x)
+
 
 class SimpleOldSparseCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
@@ -340,9 +303,9 @@ class MergedModel(nn.Module):
        if "simple_spread" in self.experiment_name:
            flattened_size = max(mlp_args.num_agents*2, mlp_args.num_landmarks*2)
            input_size = flattened_size*2 + mlp_args.nb_additional_data*2
-           self.dim_actor = mlp_args.grid_resolution*2 + mlp_args.nb_additional_data
-           self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
-           self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+           self.dim_actor = 4
+           self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+           self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
        elif "speaker" in self.experiment_name:
            self.agent_ID = mlp_args.ID
            output_comm = mlp_args.output_comm
@@ -428,19 +391,22 @@ class MergedModel(nn.Module):
                     x_inter_list.append(x_inter)
                     
         else:
-            for i in range(x.size()[1]//(self.dim_actor)):
+            print("In the merged")
+            print(len(x))
+            for i in range(len(x)//(self.dim_actor)):
                 if "simple_spread" in self.experiment_name:
-                    tensor1 = x[:, i*self.dim_actor:self.nb_additional_data+i*self.dim_actor, :]
-        
-                    result = tensor1[:, :, :2]
-                    additional_data = result.reshape(result.shape[0], 2*self.nb_additional_data)
-                    
-                    tensor2 = x[:, self.nb_additional_data+i*self.dim_actor:self.grid_resolution+self.nb_additional_data+i*self.dim_actor, :]
-                    tensor3 = x[:, self.grid_resolution+self.nb_additional_data+i*self.dim_actor:self.dim_actor+i*self.dim_actor, :]
-        
-                    x1 = self.cnn1(tensor2)
-                    x2 = self.cnn2(tensor3)
-                    x_inter = cat((additional_data, x1, x2), dim=1)
+                    velocity = x[i*self.dim_actor + 0]
+
+                    position = x[i*self.dim_actor + 1]
+
+                    x1 = self.cnn1(x[i*self.dim_actor + 2])
+                    x2 = self.cnn2(x[i*self.dim_actor + 3])
+                    print("Shapes before cat")
+                    print(velocity.shape)
+                    print(position.shape)
+                    print(x1.shape)
+                    print(x2.shape)
+                    x_inter = cat((velocity, position, x1, x2), dim=1)
                     x_inter_list.append(x_inter)
                 else:
                     tensor1 = x[:, i*self.dim_actor:1+i*self.dim_actor, :]
