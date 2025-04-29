@@ -1,15 +1,17 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_spread_cnn" 
+scenario="simple_spread_cnn_sparse" 
 num_landmarks=3
 num_agents=3
-grid_resolution=32
+grid_resolution=77
 nb_additional_data=2
 noise=0
+stride=2
+kernel=7
 algo="mappo" #"rmappo" "ippo"
-exp="simple_spread_cnn"
+exp="simple_spread_cnn_sparse"
 seed_max=5
-project="simple_spread_noise_cnn"
+project="simple_spread_test_sparse"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
@@ -20,5 +22,6 @@ do
     --scenario_name ${scenario} --num_agents ${num_agents} --num_landmarks ${num_landmarks} --seed ${seed} \
     --n_training_threads 1 --n_rollout_threads 128 --num_mini_batch 1 --episode_length 125 --num_env_steps 100000000 \
     --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
-    --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --wheel_noise ${noise}
+    --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --wheel_noise ${noise} \
+    --stride ${stride} --kernel ${kernel}
 done

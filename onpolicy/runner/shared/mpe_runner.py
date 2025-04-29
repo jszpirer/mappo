@@ -98,6 +98,8 @@ class MPERunner(Runner):
 
         # replay buffer
         if self.use_centralized_V:
+            print("In the mpe runner")
+            print(obs.shape)
             if len(obs[0][0].shape) == 2:
                 print("Using CNN")
                 share_obs = obs.reshape(self.n_rollout_threads, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
@@ -108,6 +110,7 @@ class MPERunner(Runner):
         else:
             share_obs = obs
 
+        print(share_obs.shape)
         self.buffer.share_obs[0] = share_obs.copy()
         self.buffer.obs[0] = obs.copy()
 

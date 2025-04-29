@@ -80,18 +80,10 @@ class Scenario(BaseScenario):
         return -dist2
 
     def observation(self, agent, world):
-        # goal color
-        goal_color = np.zeros(world.dim_color)
-        if agent.goal_b is not None:
-            goal_color = agent.goal_b.color
-
+        # get positions of all entities in this agent's reference frame
         # Initialize entity positions
         indices_red = np.zeros((2, world.num_landmarks//3))
         r = 0
-        indices_blue = np.zeros((2, world.num_landmarks//3))
-        b = 0
-        indices_green = np.zeros((2, world.num_landmarks//3))
-        g = 0
 
         # Calculate positions of all entities in this agent's reference frame
         for i, entity in enumerate(world.landmarks):
@@ -106,29 +98,6 @@ class Scenario(BaseScenario):
                 indices_red[0][r] = x
                 indices_red[1][r] = y
                 r += 1
-            elif color_index == 1:
-                indices_blue[0][b] = x
-                indices_blue[1][b] = y
-                b += 1
-            elif color_index == 2:
-                indices_green[0][g] = x
-                indices_green[1][g] = y
-                g += 1
-
-        # communication of all other agents
-        comm = np.zeros(world.dim_c)
-        
-        for other in world.agents:
-            if other is agent or (other.state.c is None):
-                continue
-            comm = other.state.c
-
-        # speaker
-        if not agent.movable:
-            observations = np.array([goal_color], dtype=object)
-            return observations
-        # listener
-        if agent.silent:
-            observations = np.array([agent.state.p_vel, indices_red, comm], dtype=object)
-            print(observations)
-            return obsevations
+        observations = np.array([agent.state.p_vel, indices_red], dtype=object)
+        print(observations)
+        return obsevations
