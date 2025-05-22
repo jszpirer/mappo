@@ -13,6 +13,8 @@ class Scenario(BaseScenario):
         world.num_agents = args.num_agents
         world.num_landmarks = args.num_landmarks  # 3
         world.collaborative = True
+        world.grid_resolution = args.grid_resolution
+        world.nb_additional_data = args.nb_additional_data
         # add agents
         world.agents = [Agent() for i in range(world.num_agents)]
         for i, agent in enumerate(world.agents):
@@ -20,7 +22,8 @@ class Scenario(BaseScenario):
             agent.collide = True
             agent.silent = True
             agent.size = 0.15
-            agent.u_noise = args.wheel_noise
+            # agent.u_noise = 1
+            agent.max_speed = 0.51
         # add landmarks
         world.landmarks = [Landmark() for i in range(world.num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
@@ -39,11 +42,11 @@ class Scenario(BaseScenario):
 
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            agent.state.p_pos = np.random.uniform(-3.85, +3.85, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = 0.8 * np.random.uniform(-1, +1, world.dim_p)
+            landmark.state.p_pos = 0.8 * np.random.uniform(-3.85, +3.85, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
     def benchmark_data(self, agent, world):
@@ -86,21 +89,41 @@ class Scenario(BaseScenario):
         return rew
 
     def observation(self, agent, world):
-        # get positions of all entities in this agent's reference frame
-        entity_pos = []
-        for entity in world.landmarks:  # world.entities:
-            entity_pos.append(entity.state.p_pos - agent.state.p_pos)
-        # entity colors
-        entity_color = []
-        for entity in world.landmarks:  # world.entities:
-            entity_color.append(entity.color)
-        # communication of all other agents
-        comm = []
-        other_pos = []
+        #  get positions of all entities in this agent's reference frame
+        entity_pos = np.zeros((2, world.num_landmarks))
+        j = 0
+        for i, entity in enumerate(world.landmarks):  # world.entities:
+            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= 3:
+                distance = entity.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution/(world.limit*4)
+                scale = (world.grid_resolution//2) - 1
+                entity_pos[0][i] = round(coef*distance[0]) + scale
+                entity_pos[1][i] = round(coef*distance[1]) + scale
+            else:
+                j += 1
+        if j > 0:
+            entity_pos = entity_pos[:, :-j]
+
+        other_pos = np.zeros((2, world.num_agents))
+        i = 0
+        j = 0
         for other in world.agents:
             if other is agent:
                 continue
-            comm.append(other.state.c)
-            other_pos.append(other.state.p_pos - agent.state.p_pos)
-        return np.concatenate([agent.state.p_vel] + [agent.state.p_pos] + entity_pos + other_pos)
-        #return np.concatenate([agent.state.p_vel] + entity_pos + other_pos)
+            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= 3:
+                distance = other.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution/(world.limit*4)
+                scale = (world.grid_resolution//2) - 1
+                other_pos[0][i] = round(coef*distance[0]) + scale
+                other_pos[1][i] = round(coef*distance[1]) + scale
+                i += 1
+            else:
+                j += 1
+        if j > 0:
+            other_pos = other_pos[:, :-j]
+        
+        observations = np.empty([3], dtype=object)
+        observations[:] = [agent.state.p_vel, entity_pos, other_pos]
+        return observations
+    
+    

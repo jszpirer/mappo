@@ -44,13 +44,10 @@ class MPERunner(Runner):
                 score += rewards[0]
             
             
-            #score = rewards[0]
-            print(score)
+            
             # compute return and update network
             self.compute()
-            print("Before train")
             train_infos = self.train()
-            print("After train")
             
             # post process
             total_num_steps = (episode + 1) * self.episode_length * self.n_rollout_threads
@@ -98,10 +95,7 @@ class MPERunner(Runner):
 
         # replay buffer
         if self.use_centralized_V:
-            print("In the mpe runner")
-            print(obs.shape)
             if len(obs[0][0].shape) == 2:
-                print("Using CNN")
                 share_obs = obs.reshape(self.n_rollout_threads, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
             else:
@@ -110,7 +104,6 @@ class MPERunner(Runner):
         else:
             share_obs = obs
 
-        print(share_obs.shape)
         self.buffer.share_obs[0] = share_obs.copy()
         self.buffer.obs[0] = obs.copy()
 

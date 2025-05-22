@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import gc
 from onpolicy.algorithms.utils.util import init, check
 from onpolicy.algorithms.utils.cnn import CNNBase
 from onpolicy.algorithms.utils.mlp import MLPBase
@@ -23,6 +24,8 @@ class R_Actor(nn.Module):
         super(R_Actor, self).__init__()
         self.hidden_size = args.hidden_size
 
+        self.grid_size = args.grid_resolution
+
         self._gain = args.gain
         self._use_orthogonal = args.use_orthogonal
         self._use_policy_active_masks = args.use_policy_active_masks
@@ -35,9 +38,9 @@ class R_Actor(nn.Module):
         base = MergedModel
         self.base = base(args, obs_shape)
 
-        if self._use_naive_recurrent_policy or self._use_recurrent_policy:
-            print("using recurrence")
-            self.rnn = RNNLayer(self.hidden_size, self.hidden_size, self._recurrent_N, self._use_orthogonal)
+        #if self._use_naive_recurrent_policy or self._use_recurrent_policy:
+            #print("using recurrence")
+            #self.rnn = RNNLayer(self.hidden_size, self.hidden_size, self._recurrent_N, self._use_orthogonal)
 
         self.act = ACTLayer(action_space, self.hidden_size, self._use_orthogonal, self._gain, args)
 
@@ -58,14 +61,19 @@ class R_Actor(nn.Module):
         :return action_log_probs: (torch.Tensor) log probabilities of taken actions.
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
+        #print("Before list")
+        #print(f"Allouee : {torch.cuda.memory_allocated() / 1024**2:.2f} MMB")
+        #print(f"Reservee : {torch.cuda.memory_reserved() / 1024**2:.2f} MMB")
         list_obs = []
         for i in range(len(obs[0])):
-            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs]).to(**self.tpdv)
+            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs], self.grid_size).to(**self.tpdv)
             list_obs.append(obs_to_add)
-        rnn_states = check(rnn_states).to(**self.tpdv)
-        masks = check(masks).to(**self.tpdv)
+        rnn_states = check(rnn_states, self.grid_size)
+        masks = check(masks, self.grid_size)
         if available_actions is not None:
-            available_actions = check(available_actions).to(**self.tpdv)
+            rnn_states = rnn_states.to(**self.tpdv)
+            masks = masks.to(**self.tpdv)
+            available_actions = check(available_actions, self.grid_size).to(**self.tpdv)
 
         actor_features = self.base(list_obs)
 
@@ -73,6 +81,14 @@ class R_Actor(nn.Module):
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
 
         actions, action_log_probs = self.act(actor_features, available_actions, deterministic)
+
+        actions = actions.to(torch.device("cpu"))
+        action_log_probs = action_log_probs.to(torch.device("cpu"))
+        rnn_states = rnn_states.to(torch.device("cpu"))
+        # Removing the list of observations because useless
+        #del list_obs
+        #gc.collect()
+        #torch.cuda.empty_cache()
 
         return actions, action_log_probs, rnn_states
 
@@ -92,16 +108,16 @@ class R_Actor(nn.Module):
         """
         list_obs = []
         for i in range(len(obs[0])):
-            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs]).to(**self.tpdv)
+            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs], self.grid_size).to(**self.tpdv)
             list_obs.append(obs_to_add)
-        rnn_states = check(rnn_states).to(**self.tpdv)
-        action = check(action).to(**self.tpdv)
-        masks = check(masks).to(**self.tpdv)
+        rnn_states = check(rnn_states, self.grid_size).to(**self.tpdv)
+        action = check(action, self.grid_size).to(**self.tpdv)
+        masks = check(masks, self.grid_size).to(**self.tpdv)
         if available_actions is not None:
-            available_actions = check(available_actions).to(**self.tpdv)
+            available_actions = check(available_actions, self.grid_size).to(**self.tpdv)
 
         if active_masks is not None:
-            active_masks = check(active_masks).to(**self.tpdv)
+            active_masks = check(active_masks, self.grid_size).to(**self.tpdv)
 
         actor_features = self.base(list_obs)
 
@@ -137,6 +153,9 @@ class R_Critic(nn.Module):
     def __init__(self, args, cent_obs_space, device=torch.device("cpu")):
         super(R_Critic, self).__init__()
         self.hidden_size = args.hidden_size
+
+        self.grid_size = args.grid_resolution
+        
         self._use_orthogonal = args.use_orthogonal
         self._use_naive_recurrent_policy = args.use_naive_recurrent_policy
         self._use_recurrent_policy = args.use_recurrent_policy
@@ -174,13 +193,21 @@ class R_Critic(nn.Module):
         """
         list_cent_obs = []
         for i in range(len(cent_obs[0])):
-            cent_obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in cent_obs]).to(**self.tpdv)
+            cent_obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in cent_obs], self.grid_size).to(**self.tpdv)
             list_cent_obs.append(cent_obs_to_add)
-        rnn_states = check(rnn_states).to(**self.tpdv)
-        masks = check(masks).to(**self.tpdv)
+        rnn_states = check(rnn_states, self.grid_size)
+        masks = check(masks, self.grid_size)
 
         critic_features = self.base(list_cent_obs)
+
+        # Removing the list of observations because useless
+        #del list_cent_obs
+        #gc.collect()
+        #torch.cuda.empty_cache()
+
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
+            rnn_states = rnn_states.to(**self.tpdv)
+            masks = masks.to(**self.tpdv)
             critic_features, rnn_states = self.rnn(critic_features, rnn_states, masks)
         values = self.v_out(critic_features)
 

@@ -11,13 +11,13 @@ class Scenario(BaseScenario):
         # set any world properties first
         world.dim_c = 2
         world.limit = 4
-        num_agents = args.num_agents
-        num_landmarks = args.num_landmarks
+        world.num_agents = args.num_agents
+        world.num_landmarks = args.num_landmarks
         world.collaborative = True
         world.one_reward = True
         self.distribution_radius = 3.85
         # add agents
-        world.agents = [Agent() for i in range(num_agents)]
+        world.agents = [Agent() for i in range(world.num_agents)]
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             agent.collide = True
@@ -26,12 +26,13 @@ class Scenario(BaseScenario):
             agent.u_noise = 1
             agent.max_speed = 0.51
         # add landmarks
-        world.landmarks = [Landmark() for i in range(num_landmarks)]
+        world.landmarks = [Landmark() for i in range(world.num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
             landmark.name = 'landmark %d' % i
             landmark.collide = False
             landmark.movable = False
-            landmark.size = 1.2857
+            #landmark.size = 1.2857
+            landmark.size = 1
         # make initial conditions
         self.reset_world(world)
         return world
@@ -48,10 +49,9 @@ class Scenario(BaseScenario):
             agent.state.p_pos = np.random.uniform(-3.85, +3.85, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
-        world.landmarks[0].state.p_pos = np.array([2.1429, 2.1429])
-        world.landmarks[1].state.p_pos = np.array([2.1429, -2.1429])
-        world.landmarks[2].state.p_pos = np.array([-2.1429, 0.0])
         for i, landmark in enumerate(world.landmarks):
+            #landmark.state.p_pos = np.random.uniform(-2.7143, +2.7143, world.dim_p)
+            landmark.state.p_pos = np.random.uniform(-3, +3, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
     def benchmark_data(self, agent, world):
@@ -84,6 +84,7 @@ class Scenario(BaseScenario):
        dist_3 = np.sqrt(np.sum(np.square(point - world.landmarks[2].state.p_pos)))
 
        if dist_1 <= world.landmarks[0].size or dist_2 <= world.landmarks[1].size or dist_3 <= world.landmarks[2].size:
+           print("On landmark")
            return True
        return False
 
@@ -104,7 +105,8 @@ class Scenario(BaseScenario):
         # The expected distance between a randomly selected point and any robot
         fExpectedDistance = 0
 
-        nb_trials = 1000
+        #nb_trials = 1000
+        nb_trials = 3000
 
         agents_to_consider = []
 
@@ -126,63 +128,34 @@ class Scenario(BaseScenario):
 
     
     
-    def reward(self, agent, world):
-        
+    def reward(self, agent, world):      
         performance = ((2 * self.distribution_radius) - self.get_expected_distance(world)) * 100
         if performance < 0:
             performance = 0
         return performance
 
     def observation(self, agent, world):
-        # Definition of the range of detection for the agents
-        detection_range = 3
-        # get positions of all entities in this agent's reference frame
-        entity_pos = []
-        indices = np.array([item for item in range(0, len(world.landmarks))])
-        duplicate = False
-        duplicates = []
+        #  get positions of all entities in this agent's reference frame
+        entity_pos = np.zeros((2, world.num_landmarks))
         for i, entity in enumerate(world.landmarks):  # world.entities:
-            if math.dist(entity.state.p_pos, agent.state.p_pos) < detection_range and random.uniform(0,1) > 0.85:
-                index = np.argwhere(indices==i)
-                indices = np.delete(indices, index)
-                entity_pos.append(entity.state.p_pos - agent.state.p_pos)
-                duplicates.append(entity.state.p_pos - agent.state.p_pos)
-                duplicate = True
-            else:
-                entity_pos.append(np.array([0, 0]))
-        if len(indices) > 0:
-            for index in indices:
-                if duplicate:
-                    entity_pos[index] = random.choice(duplicates)
-                else:
-                    x = random.uniform(max(-world.limit, agent.state.p_pos[0] - detection_range), min(world.limit, agent.state.p_pos[0] + detection_range))
-                    y = random.uniform(max(-world.limit, agent.state.p_pos[1] - detection_range), min(world.limit, agent.state.p_pos[1] + detection_range))
-                    entity_pos[index] = agent.state.p_pos - np.array([x, y])  
+            distance = entity.state.p_pos - agent.state.p_pos
+            coef = world.grid_resolution/(world.limit*4)
+            scale = (world.grid_resolution//2) - 1
+            entity_pos[0][i] = round(coef*distance[0]) + scale
+            entity_pos[1][i] = round(coef*distance[1]) + scale
 
-        other_pos = []
-        duplicate = False
-        duplicates = []
-        indices = []
+        other_pos = np.zeros((2, world.num_agents))
         i = 0
         for other in world.agents:
-            if other is agent: continue
-            if math.dist(other.state.p_pos, agent.state.p_pos) < detection_range and random.uniform(0,1) > 0.85:
-                noise = np.random.normal(0, 1, other.state.p_pos.shape)
-                position = other.state.p_pos + noise
-                other_pos.append(position - agent.state.p_pos)
-                duplicates.append(position - agent.state.p_pos)
-                duplicate = True
-            else:
-                indices.append(i)
-                other_pos.append(np.array([0, 0]))
+            if other is agent:
+                continue
+            distance = other.state.p_pos - agent.state.p_pos
+            coef = world.grid_resolution/(world.limit*4)
+            scale = (world.grid_resolution//2) - 1
+            other_pos[0][i] = round(coef*distance[0]) + scale
+            other_pos[1][i] = round(coef*distance[1]) + scale
             i += 1
-        if len(indices) > 0:
-            for index in indices:
-                if duplicate:
-                    other_pos[index] = random.choice(duplicates)
-                else:
-                    x = random.uniform(max(-world.limit, agent.state.p_pos[0] - detection_range), min(world.limit, agent.state.p_pos[0] + detection_range))
-                    y = random.uniform(max(-world.limit, agent.state.p_pos[1] - detection_range), min(world.limit, agent.state.p_pos[1] + detection_range)) 
-                    other_pos[index] = agent.state.p_pos - np.array([x, y])                  
-
-        return np.concatenate([agent.state.p_vel] + entity_pos + other_pos)
+        
+        observations = np.empty([4], dtype=object)
+        observations[:] = [agent.state.p_vel, agent.state.p_pos, entity_pos, other_pos]
+        return observations

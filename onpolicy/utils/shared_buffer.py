@@ -361,8 +361,10 @@ class SharedReplayBuffer(object):
         rand = torch.randperm(batch_size).numpy()
         sampler = [rand[i * mini_batch_size:(i + 1) * mini_batch_size] for i in range(num_mini_batch)]
 
-        share_obs = self.share_obs[:-1].reshape(-1, *self.share_obs.shape[3:])
-        obs = self.obs[:-1].reshape(-1, *self.obs.shape[3:])
+        concatenated_share_obs = np.concatenate(self.share_obs[:-1], axis=0)
+        share_obs = concatenated_share_obs.reshape(-1, *self.share_obs[0].shape[2:])
+        concatenated_obs = np.concatenate(self.obs[:-1], axis=0)
+        obs = concatenated_obs.reshape(-1, *self.obs[0].shape[2:])
         rnn_states = self.rnn_states[:-1].reshape(-1, *self.rnn_states.shape[3:])
         rnn_states_critic = self.rnn_states_critic[:-1].reshape(-1, *self.rnn_states_critic.shape[3:])
         actions = self.actions.reshape(-1, self.actions.shape[-1])

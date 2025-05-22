@@ -146,7 +146,6 @@ class MultiAgentEnv(gym.Env):
 
         # all agents get total reward in cooperative case, if shared reward, all agents have the same reward, and reward is sum
         if self.world.one_reward:
-            print("Test if world.one_reward")
             reward = self._get_reward(agent)
         else:
             # all agents get total reward in cooperative case
