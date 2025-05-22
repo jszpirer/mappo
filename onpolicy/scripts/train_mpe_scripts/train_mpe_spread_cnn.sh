@@ -8,10 +8,10 @@ nb_additional_data=2
 noise=0
 stride=2
 kernel=7
-algo="mappo" #"rmappo" "ippo"
-exp="simple_spread_cnn_sparse77_moresteps"
+algo="rmappo" #"mappo" "ippo"
+exp="simple_spread_cnn_sparse77"
 seed_max=5
-project="simple_spread_normal"
+project="simple_spread_normal_rnn"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;

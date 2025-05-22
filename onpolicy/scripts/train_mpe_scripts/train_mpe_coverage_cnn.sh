@@ -1,17 +1,17 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_coverage_cnn_sparse_localj_onereward" 
+scenario="simple_coverage_cnn_sparse_localj" 
 num_landmarks=0
-num_agents=5
+num_agents=10
 grid_resolution=77
 nb_additional_data=2
 noise=0
 stride=2
 kernel=7
 algo="mappo" #"rmappo" "ippo"
-exp="simple_coverage_cnn_sparse77_localj_onereward"
+exp="simple_coverage_cnn_sparse77_localj_memory"
 seed_max=5
-project="simple_coverage_5agents"
+project="simple_coverage_20agents"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
