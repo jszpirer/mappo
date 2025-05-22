@@ -58,11 +58,11 @@ class Scenario(BaseScenario):
         world.agents[1].goal_a.color = world.agents[1].goal_b.color
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-3.85, +3.85, world.dim_p)
+            agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = 0.8 * np.random.uniform(-3.85, +3.85, world.dim_p)
+            landmark.state.p_pos = 0.8 * np.random.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
     def reward(self, agent, world):
@@ -73,24 +73,36 @@ class Scenario(BaseScenario):
         return -dist2  # np.exp(-dist2)
 
     def observation(self, agent, world):
-        goal_color = [np.zeros(world.dim_color), np.zeros(world.dim_color)]
+        # goal color
+        goal_color = np.zeros(world.dim_color)
         if agent.goal_b is not None:
-            goal_color[1] = agent.goal_b.color
-        # get positions of all entities in this agent's reference frame
-        entity_pos = np.zeros((world.grid_resolution, world.grid_resolution))
-        for entity in world.landmarks:  # world.entities:
-            distance = entity.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution/(world.limit*4)
-            scale = (world.grid_resolution//2) - 1
-            entity_pos[round(coef*distance[0]) + scale][round(coef*distance[1]) + scale] = 1
+            goal_color = agent.goal_b.color
+
+        # entity positions as many channels as there are different colors for the landmarks
+        entity_pos = np.zeros((3, 2, world.num_landmarks))
+        
+        # Calculate positions of all entities in this agent's reference frame
+        for i, entity in enumerate(world.landmarks):
+            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= 3:
+                distance = entity.state.p_pos - agent.state.p_pos
+                coef = world.grid_resolution / (world.limit * 4)
+                scale = (world.grid_resolution // 2) - 1 + world.grid_resolution % 2
+                x = round(coef * distance[0]) + scale
+                y = round(coef * distance[1]) + scale            
+                
+                # Determine color based on index
+                color_index = i % 3
+                entity_pos[color_index][0][i] = x
+                entity_pos[color_index][1][i] = y
+
         # communication of all other agents
-        comm = []
+        comm = np.zeros(world.dim_c)
         for other in world.agents:
-            if other is agent:
+            if other is agent or (other.state.c is None):
                 continue
-            comm.append(other.state.c)
-        vel = [np.pad(agent.state.p_vel, (0, world.grid_resolution-2), 'constant', constant_values = 0)]
-        goal_color = [np.pad(goal_color[1], (0, world.grid_resolution-3), 'constant', constant_values = 0)]
-        comm_padded = [np.pad(comm[0], (0, world.grid_resolution-10), 'constant', constant_values = 0)]
-        observations = np.concatenate((np.array(vel), np.array(goal_color), np.array(comm_padded), np.array(entity_pos)), axis=0)
+            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= 3:
+                comm = other.state.c
+                
+        observations = np.empty([6], dtype=object)
+        observations[:] = [goal_color, agent.state.p_vel, entity_pos[0], entity_pos[1], entity_pos[2], comm]
         return observations

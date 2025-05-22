@@ -678,7 +678,9 @@ class DummyVecEnv(ShareVecEnv):
 
     def step_wait(self):
         results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-        obs, rews, dones, infos = map(np.array, zip(*results))
+        obs, rews, dones, infos = zip(*results)
+        dones = np.stack(dones)
+        obs=np.array(obs, dtype=object)
 
         for (i, done) in enumerate(dones):
             if 'bool' in done.__class__.__name__:
@@ -689,11 +691,12 @@ class DummyVecEnv(ShareVecEnv):
                     obs[i] = self.envs[i].reset()
 
         self.actions = None
-        return obs, rews, dones, infos
+        return obs,  np.stack(rews), dones, infos
 
     def reset(self):
         obs = [env.reset() for env in self.envs]
-        return np.array(obs)
+        stacked = np.array(obs, dtype=object)
+        return stacked
 
     def close(self):
         for env in self.envs:

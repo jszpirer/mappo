@@ -13,7 +13,7 @@ def init(module, weight_init, bias_init, gain=1):
 def get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
-def check(input):
+def check(input, grid_size):
     if type(input) == torch.Tensor:
         return input
     if type(input) == np.ndarray:
@@ -48,7 +48,7 @@ def check(input):
     batch_indices = torch.stack([batch_indices, x_indices, y_indices])
 
     # Determine the batch size
-    batch_size = (len(input), 77, 77)
+    batch_size = (len(input), grid_size, grid_size)
 
     # Create the batch sparse tensor
     batch_sparse_tensor = torch.sparse_coo_tensor(batch_indices, values, batch_size)
