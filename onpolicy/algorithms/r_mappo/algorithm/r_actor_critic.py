@@ -38,9 +38,9 @@ class R_Actor(nn.Module):
         base = MergedModel
         self.base = base(args, obs_shape)
 
-        #if self._use_naive_recurrent_policy or self._use_recurrent_policy:
-            #print("using recurrence")
-            #self.rnn = RNNLayer(self.hidden_size, self.hidden_size, self._recurrent_N, self._use_orthogonal)
+        if self._use_naive_recurrent_policy or self._use_recurrent_policy:
+            print("using recurrence")
+            self.rnn = RNNLayer(self.hidden_size, self.hidden_size, self._recurrent_N, self._use_orthogonal)
 
         self.act = ACTLayer(action_space, self.hidden_size, self._use_orthogonal, self._gain, args)
 
@@ -71,13 +71,13 @@ class R_Actor(nn.Module):
         rnn_states = check(rnn_states, self.grid_size)
         masks = check(masks, self.grid_size)
         if available_actions is not None:
-            rnn_states = rnn_states.to(**self.tpdv)
-            masks = masks.to(**self.tpdv)
             available_actions = check(available_actions, self.grid_size).to(**self.tpdv)
 
         actor_features = self.base(list_obs)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
+            rnn_states = rnn_states.to(**self.tpdv)
+            masks = masks.to(**self.tpdv)
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
 
         actions, action_log_probs = self.act(actor_features, available_actions, deterministic)

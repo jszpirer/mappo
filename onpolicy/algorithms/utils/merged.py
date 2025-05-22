@@ -1,5 +1,6 @@
 import torch.nn as nn
 import spconv.pytorch as spconv
+from torch.cuda.amp import autocast
 from torch import cat, chunk, set_printoptions, inf, sparse_coo_tensor
 from .util import init
 
@@ -13,42 +14,41 @@ class SimpleSparseMemoryOptimized(nn.Module):
 
         
         self.net = spconv.SparseSequential(
-            spconv.SparseConv2d(in_channels=1, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
-            nn.Tanh()
-        )
-        input_width = obs_shape[0]
-        self.size = ((input_width - kernel_size) // stride + 1)
-        self.fc = nn.Linear(in_features=self.size * self.size, out_features=output_size)       
+            spconv.SparseConv2d(in_channels=1, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
+            nn.Tanh()
+        )
+        input_width = obs_shape[0]
+        self.size = ((input_width - kernel_size) // stride + 1)
+        self.fc = nn.Linear(in_features=self.size * self.size, out_features=output_size)       
         self.tanh = nn.Tanh()
-        self.flatten = nn.Flatten()
+        self.flatten = nn.Flatten()
 
-    def forward(self, x):
-        # Use autocast for mixed precision
-        with autocast():
-            # Coalesce once
-            sparse = x.coalesce()
-            indices = sparse.indices().permute(1, 0).contiguous().int()
-            values = sparse.values().view(-1, 1).half()  # Use float16 if supported
+    def forward(self, x):
+        # Use autocast for mixed precision
+        #with autocast():
+        # Coalesce once
+        sparse = x.coalesce()
+        indices = sparse.indices().permute(1, 0).contiguous().int()
+        values = sparse.values().view(-1, 1).float() #.half() # Use float16 if supported
             
-            sparse_tensor = spconv.SparseConvTensor(
-                features=values,
-                indices=indices,
-                spatial_shape=x.size()[1:],
-                batch_size=x.size(0)
-            )
+        sparse_tensor = spconv.SparseConvTensor(
+                features=values,
+                indices=indices,
+                spatial_shape=x.size()[1:],
+                batch_size=x.size(0)
+            )
 
-            output = self.net(sparse_tensor)
+        output = self.net(sparse_tensor)
             
             # Flatten spatial coordinates
-            coords = output.indices
-            coords[:, 1] = coords[:, 1] * self.size + coords[:, 2]
-            flat_indices = coords[:, :2].permute(1, 0).contiguous().int()
-            flat_values = output.features.view(-1)
+        coords = output.indices
+        coords[:, 1] = coords[:, 1] * self.size + coords[:, 2]
+        flat_indices = coords[:, :2].permute(1, 0).contiguous().int()
+        flat_values = output.features.view(-1)
 
-            flat = sparse_coo_tensor(flat_indices, flat_values, size=(x.size(0), self.size * self.size))
-
-            x = self.fc(dense_flat)
-            return self.tanh(x)
+        flat = sparse_coo_tensor(flat_indices, flat_values, size=(x.size(0), self.size * self.size))
+        x = self.fc(flat)
+        return self.tanh(x)
 
 class SimplSparseSpreadCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
@@ -186,13 +186,18 @@ class MergedModel(nn.Module):
            else:
                self.dim_actor = 4
            if "memory" in self.experiment_name:
+               flattened_size = 4
+               input_size = flattened_size*2 + mlp_args.nb_additional_data*2
                self.cnn1 = SimpleSparseMemoryOptimized((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                self.cnn2 = SimpleSparseMemoryOptimized((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
            else:
                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
        elif "coverage" in self.experiment_name:
-           flattened_size = mlp_args.num_agents*2
+           if "memory" in self.experiment_name:
+               flattened_size = 20
+           else:
+               flattened_size = mlp_args.num_agents*2
            input_size = flattened_size + mlp_args.nb_additional_data*2
            if "local" in self.experiment_name:
                input_size = flattened_size + mlp_args.nb_additional_data

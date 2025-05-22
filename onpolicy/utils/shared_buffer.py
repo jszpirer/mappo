@@ -52,9 +52,9 @@ class SharedReplayBuffer(object):
             share_obs_shape = share_obs_shape[:1]
 
         
-        self.share_obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, num_agents, *share_obs_shape),
-                                  dtype=np.float32).tolist()
-        self.obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, num_agents, *obs_shape), dtype=np.float32).tolist()
+        self.share_obs = np.empty((self.episode_length + 1, self.n_rollout_threads, num_agents, *share_obs_shape),
+                                  dtype=object)
+        self.obs = np.empty((self.episode_length + 1, self.n_rollout_threads, num_agents, *obs_shape), dtype=object)
 
         self.rnn_states = np.zeros(
             (self.episode_length + 1, self.n_rollout_threads, num_agents, self.recurrent_N, self.hidden_size),
@@ -514,6 +514,7 @@ class SharedReplayBuffer(object):
         rand = torch.randperm(data_chunks).numpy()
         sampler = [rand[i * mini_batch_size:(i + 1) * mini_batch_size] for i in range(num_mini_batch)]
 
+        
         if len(self.share_obs.shape) > 4:
             share_obs = self.share_obs[:-1].transpose(1, 2, 0, 3, 4, 5).reshape(-1, *self.share_obs.shape[3:])
             obs = self.obs[:-1].transpose(1, 2, 0, 3, 4, 5).reshape(-1, *self.obs.shape[3:])
