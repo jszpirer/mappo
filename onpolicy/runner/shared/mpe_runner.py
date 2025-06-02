@@ -17,31 +17,35 @@ class MPERunner(Runner):
         self.warmup()   
 
         start = time.time()
-        episodes = int(self.num_env_steps) // self.episode_length // self.n_rollout_threads
+        episodes = int(self.num_env_steps) // self.episode_length // self.batch_size
+
+        iterations_before_training = self.batch_size // self.n_rollout_threads
 
         scores = []
 
         for episode in range(episodes):
-            if self.use_linear_lr_decay:
-                self.trainer.policy.lr_decay(episode, episodes)
-            
-            score = 0
+            for it in range(iterations_before_training):
+                if self.use_linear_lr_decay:
+                    self.trainer.policy.lr_decay(episode, episodes)
+                
+                score = 0
 
-            for step in range(self.episode_length):
-                # Sample actions
-                values, actions, action_log_probs, rnn_states, rnn_states_critic, actions_env = self.collect(step)
-                    
-                # Obser reward and next obs
-                obs, rewards, dones, infos = self.envs.step(actions_env)
+                for step in range(self.episode_length):
+                    # Sample actions
+                    values, actions, action_log_probs, rnn_states, rnn_states_critic, actions_env = self.collect(step, it)
+                        
+                    # Obser reward and next obs
+                    obs, rewards, dones, infos = self.envs.step(actions_env)
 
-                data = obs, rewards, dones, infos, values, actions, action_log_probs, rnn_states, rnn_states_critic
+                    data = obs, rewards, dones, infos, values, actions, action_log_probs, rnn_states, rnn_states_critic
 
-                # insert data into buffer
-                self.insert(data)
+                    # insert data into buffer
+                    self.insert(data, it)
 
-                ####### Remove this comment if needed
-                #add value to the score because for aggregation score in a sum of the rewards
-                score += rewards[0]
+                    ####### Remove this comment if needed
+                    #add value to the score because for aggregation score in a sum of the rewards
+                    score += rewards[0]
+
             
             
             
@@ -91,15 +95,19 @@ class MPERunner(Runner):
 
     def warmup(self):
         # reset env
-        obs = self.envs.reset()
+        list_obs = []
+        for it in range(self.batch_size // self.n_rollout_threads):
+            obs = self.envs.reset()
+            list_obs.append(obs)
+        obs = np.concatenate(list_obs, axis=0)
 
         # replay buffer
         if self.use_centralized_V:
             if len(obs[0][0].shape) == 2:
-                share_obs = obs.reshape(self.n_rollout_threads, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
+                share_obs = obs.reshape(self.batch_size, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
             else:
-                share_obs = obs.reshape(self.n_rollout_threads, -1)
+                share_obs = obs.reshape(self.batch_size, -1)
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
         else:
             share_obs = obs
@@ -108,14 +116,14 @@ class MPERunner(Runner):
         self.buffer.obs[0] = obs.copy()
 
     @torch.no_grad()
-    def collect(self, step):
+    def collect(self, step, it):
         self.trainer.prep_rollout()
         value, action, action_log_prob, rnn_states, rnn_states_critic \
-            = self.trainer.policy.get_actions(np.concatenate(self.buffer.share_obs[step]),
-                            np.concatenate(self.buffer.obs[step]),
-                            np.concatenate(self.buffer.rnn_states[step]),
-                            np.concatenate(self.buffer.rnn_states_critic[step]),
-                            np.concatenate(self.buffer.masks[step]))
+            = self.trainer.policy.get_actions(np.concatenate(self.buffer.share_obs[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
+                            np.concatenate(self.buffer.obs[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
+                            np.concatenate(self.buffer.rnn_states[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
+                            np.concatenate(self.buffer.rnn_states_critic[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
+                            np.concatenate(self.buffer.masks[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]))
         # [self.envs, agents, dim]
         values = np.array(np.split(_t2n(value), self.n_rollout_threads))
         actions = np.array(np.split(_t2n(action), self.n_rollout_threads))
@@ -137,7 +145,7 @@ class MPERunner(Runner):
 
         return values, actions, action_log_probs, rnn_states, rnn_states_critic, actions_env
 
-    def insert(self, data):
+    def insert(self, data, it):
         obs, rewards, dones, infos, values, actions, action_log_probs, rnn_states, rnn_states_critic = data
 
         rnn_states[dones == True] = np.zeros(((dones == True).sum(), self.recurrent_N, self.hidden_size), dtype=np.float32)
@@ -156,7 +164,7 @@ class MPERunner(Runner):
         else:
             share_obs = obs
 
-        self.buffer.insert(share_obs, obs, rnn_states, rnn_states_critic, actions, action_log_probs, values, rewards, masks)
+        self.buffer.insert(it, share_obs, obs, rnn_states, rnn_states_critic, actions, action_log_probs, values, rewards, masks)
 
     @torch.no_grad()
     def eval(self, total_num_steps):

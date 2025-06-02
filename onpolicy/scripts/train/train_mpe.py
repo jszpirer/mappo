@@ -67,6 +67,7 @@ def parse_args(args, parser):
     parser.add_argument("--output_other", type=int, default=0)
     parser.add_argument("--curriculum_start", type=int, default=0)
     parser.add_argument("--obs_range", type=float, default=3)
+    parser.add_argument("--batch_size", type=int, default=128)
 
     all_args = parser.parse_known_args(args)[0]
 
