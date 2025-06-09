@@ -102,6 +102,58 @@ class SimpleOldSparseCNN(nn.Module):
 
         return self.tanh(x)
 
+class SimpleSpreadSparseCNN(nn.Module):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
+        super(SimpleSpreadSparseCNN, self).__init__()
+
+        # Create separate convolutional layers for each channel
+        self.net = spconv.SparseSequential(
+            spconv.SparseConv2d(in_channels=1, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
+            nn.Tanh()
+        )
+        self.tanh = nn.Tanh()
+        self.size = (obs_shape[1] - (kernel_size - 1) - 1) // stride + 1
+        self.output_channels = output_channels
+        self.fc = nn.Linear(in_features=self.size * self.size, out_features=output_size)
+
+    def forward(self, x):
+        set_printoptions(threshold=inf)
+
+        # Convert each channel to a sparse tensor
+        red_sparse = x
+        red_indices = red_sparse.coalesce().indices().permute(1, 0).contiguous().int()
+        red_values = red_sparse.coalesce().values().view(-1, 1)
+        red_sparse = spconv.SparseConvTensor(red_values, red_indices, x.size()[1:], batch_size = x.size()[0])
+
+        #print(red_sparse.batch_size)
+        #print(self.conv_red(red_sparse))
+        # Apply convolutional layers to each sparse tensor
+        red_output = self.net(red_sparse)
+        #green_output = self.tanh(self.conv_green(green_sparse).dense())
+        #blue_output = self.tanh(self.conv_blue(blue_sparse).dense())
+
+        #print(self.conv_red(red_sparse).indices)
+        #print(red_output.shape)
+        coords = red_output.indices
+        new_coords = coords[:, :2].clone()
+        new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
+        red_output.indices = new_coords
+
+        # Flatten the outputs
+        # red_flat = red_output.view(red_output.size(0), -1)
+        red_flat_indices = red_output.indices.permute(1, 0).contiguous().int()
+        red_flat_values = red_output.features.view(red_output.features.shape[0])
+        red_flat = sparse_coo_tensor(red_flat_indices, red_flat_values, size=(x.size()[0], self.size*self.size))
+        
+        
+        # Pass the flattened outputs through the linear layers
+        x = self.fc(red_flat)
+
+        # Concatenate the outputs of the linear layers
+        #x = cat((red_out, green_out, blue_out), dim=1)
+
+        return self.tanh(x)
+
 class SimpleCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
         super(SimpleCNN, self).__init__()
@@ -244,8 +296,8 @@ class MergedModel(nn.Module):
            flattened_size = max(mlp_args.num_agents*2, mlp_args.num_landmarks*2)
            input_size = flattened_size*2 + mlp_args.nb_additional_data*2
            self.dim_actor = mlp_args.grid_resolution*2 + mlp_args.nb_additional_data
-           self.cnn1 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
-           self.cnn2 = CNNLayer((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+           self.cnn1 = SimpleSpreadSparseCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
+           self.cnn2 = SimpleSpreadSparseCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU)
        elif "speaker" in self.experiment_name:
            self.agent_ID = mlp_args.ID
            output_comm = mlp_args.output_comm
