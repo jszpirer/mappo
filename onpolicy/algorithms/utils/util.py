@@ -13,37 +13,34 @@ def init(module, weight_init, bias_init, gain=1):
 def get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
+
 def check(input):
-    if type(input) == np.ndarray:
-        return torch.from_numpy(input)
-    # Flatten the list of lists
-    flattened_sparse_tensors = input
+    if isinstance(input, np.ndarray):
+        return torch.from_numpy(input)
 
-    # Initialize lists to store batch indices and tensor indices
-    batch_indices_list = []
-    tensor_indices_list = []
+    # input est une liste de sparse tensors de même forme
+    n = len(input)
+    sparse = input[0]
+    k = sparse.values().size(0)  # nombre de non-zéros par tensor (supposé constant)
 
-    # Iterate through the flattened sparse tensors to create batch indices
-    for batch_idx, tensor in enumerate(flattened_sparse_tensors):
-        tensor_indices = tensor.indices()
-        batch_indices = torch.full((1, tensor_indices.size(1)), batch_idx, dtype=torch.long)
-        batch_indices_list.append(batch_indices)
-        tensor_indices_list.append(tensor_indices)
+    # Stack des indices et valeurs
+    tensor_indices = torch.stack([t.indices() for t in input])  # (n, ndim, k)
+    tensor_values = torch.stack([t.values() for t in input])    # (n, k)
 
-    # Concatenate batch indices and tensor indices
-    batch_indices = torch.cat(batch_indices_list, dim=1)
-    tensor_indices = torch.cat(tensor_indices_list, dim=1)
+    # Création des indices de batch
+    batch_indices = torch.arange(n).view(n, 1).expand(n, k)     # (n, k)
+    batch_indices = batch_indices.unsqueeze(1)                  # (n, 1, k)
 
-    # Combine batch indices with tensor indices
-    combined_indices = torch.cat([batch_indices, tensor_indices], dim=0)
+    # Concaténation des indices batch + indices tensoriels
+    full_indices = torch.cat([batch_indices, tensor_indices], dim=1)  # (n, ndim+1, k)
+    full_indices = full_indices.reshape(full_indices.size(1), -1)     # (ndim+1, n*k)
 
-    # Concatenate values from each sparse tensor
-    batch_values = torch.cat([tensor.values() for tensor in flattened_sparse_tensors])
+    # Aplatissement des valeurs
+    full_values = tensor_values.reshape(-1)
 
-    # Determine the batch size
-    batch_size = (len(flattened_sparse_tensors), *flattened_sparse_tensors[0].size())
+    # Taille finale
+    shape = (n,) + sparse.size()
 
-    # Create the batch sparse tensor
-    batch_sparse_tensor = torch.sparse_coo_tensor(combined_indices, batch_values, batch_size)
+    return torch.sparse_coo_tensor(full_indices, full_values, shape)
 
-    return batch_sparse_tensor
+
