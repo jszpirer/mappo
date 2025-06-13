@@ -38,29 +38,13 @@ def check(input, grid_size, device):
     # Flatten the list of lists
     flattened_sparse_tensors = input
 
-    #Étape 1 : calcul du nombre total d'éléments
-    #counts = [len(x[0]) for x in input]
-    #total = sum(counts)
-    #input_x = [x[0] for x in input]
-    #input_y = [x[1] for x in input]
     lengths = np.array([len(x[0]) for x in input], dtype=np.int32)
     total = lengths.sum()
-    #Étape 2 : préallocation sur le bon device
-    #batch_indices_np = np.empty(total, dtype=np.int32)
-    #x_indices_np = np.empty(total, dtype=np.int32)
-    #y_indices_np = np.empty(total, dtype=np.int32)
-
-    #fill_indices(input_x, input_y, batch_indices_np, x_indices_np, y_indices_np)
-    #Étape 3 : remplissage en un seul passage
-    #offset = 0
-    #for batch_idx, (x, y) in enumerate(input):
-	#n = len(x)
-	#end = offset + n
+	
     batch_indices_np = np.repeat(np.arange(len(input), dtype=np.int32), lengths)
     x_indices_np = np.concatenate([x[0] for x in input])
     y_indices_np = np.concatenate([x[1] for x in input])
-	#offset = end
-    #Création des indices et valeurs
+	
     batch_indices = torch.from_numpy(batch_indices_np).to(device)
     x_indices = torch.from_numpy(x_indices_np).to(device)
     y_indices = torch.from_numpy(y_indices_np).to(device)
