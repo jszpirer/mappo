@@ -33,6 +33,7 @@ class Runner(object):
         self.num_env_steps = self.all_args.num_env_steps
         self.episode_length = self.all_args.episode_length
         self.n_rollout_threads = self.all_args.n_rollout_threads
+        self.batch_size = self.all_args.batch_size
         self.n_eval_rollout_threads = self.all_args.n_eval_rollout_threads
         self.n_render_rollout_threads = self.all_args.n_render_rollout_threads
         self.use_linear_lr_decay = self.all_args.use_linear_lr_decay
@@ -126,7 +127,7 @@ class Runner(object):
             next_values = self.trainer.policy.get_values(np.concatenate(self.buffer.share_obs[-1]),
                                                         np.concatenate(self.buffer.rnn_states_critic[-1]),
                                                         np.concatenate(self.buffer.masks[-1]))
-        next_values = np.array(np.split(_t2n(next_values), self.n_rollout_threads))
+        next_values = np.array(np.split(_t2n(next_values), self.batch_size))
         self.buffer.compute_returns(next_values, self.trainer.value_normalizer)
     
     def train(self):

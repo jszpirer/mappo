@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import gc
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
 from onpolicy.algorithms.utils.util import init, check
 from onpolicy.algorithms.utils.cnn import CNNBase
 from onpolicy.algorithms.utils.mlp import MLPBase
@@ -10,6 +12,11 @@ from onpolicy.algorithms.utils.rnn import RNNLayer
 from onpolicy.algorithms.utils.act import ACTLayer
 from onpolicy.algorithms.utils.popart import PopArt
 from onpolicy.utils.util import get_shape_from_obs_space
+
+
+def process_single_obs(i, obs, grid_size, device):
+    obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], grid_size, device)
+    return obs_to_add
 
 
 class R_Actor(nn.Module):
@@ -22,6 +29,8 @@ class R_Actor(nn.Module):
     """
     def __init__(self, args, obs_space, action_space, device=torch.device("cpu")):
         super(R_Actor, self).__init__()
+
+        #mp.set_start_method('spawn', force=True)
         self.hidden_size = args.hidden_size
 
         self.grid_size = args.grid_resolution
@@ -33,6 +42,7 @@ class R_Actor(nn.Module):
         self._use_recurrent_policy = args.use_recurrent_policy
         self._recurrent_N = args.recurrent_N
         self.tpdv = dict(dtype=torch.float32, device=device)
+        self.device = device
 
         obs_shape = get_shape_from_obs_space(obs_space)
         base = MergedModel
@@ -65,26 +75,29 @@ class R_Actor(nn.Module):
         #print(f"Allouee : {torch.cuda.memory_allocated() / 1024**2:.2f} MMB")
         #print(f"Reservee : {torch.cuda.memory_reserved() / 1024**2:.2f} MMB")
         list_obs = []
+        #with ProcessPoolExecutor() as executor:
+            #futures = [executor.submit(process_single_obs, i, obs, self.grid_size, self.device) for i in range(len(obs[0]))]
+            #list_obs = [f.result() for f in futures]
         for i in range(len(obs[0])):
-            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs], self.grid_size).to(**self.tpdv)
+            obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
             list_obs.append(obs_to_add)
-        rnn_states = check(rnn_states, self.grid_size)
-        masks = check(masks, self.grid_size)
+        rnn_states = check(rnn_states, self.grid_size, self.device)
+        masks = check(masks, self.grid_size, self.device)
         if available_actions is not None:
-            available_actions = check(available_actions, self.grid_size).to(**self.tpdv)
+            available_actions = check(available_actions, self.grid_size, self.device)
 
         actor_features = self.base(list_obs)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
-            rnn_states = rnn_states.to(**self.tpdv)
-            masks = masks.to(**self.tpdv)
+            rnn_states = rnn_states
+            masks = masks
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
 
         actions, action_log_probs = self.act(actor_features, available_actions, deterministic)
 
-        actions = actions.to(torch.device("cpu"))
-        action_log_probs = action_log_probs.to(torch.device("cpu"))
-        rnn_states = rnn_states.to(torch.device("cpu"))
+        #actions = actions.to(torch.device("cpu"))
+        #action_log_probs = action_log_probs.to(torch.device("cpu"))
+        #rnn_states = rnn_states.to(torch.device("cpu"))
         # Removing the list of observations because useless
         #del list_obs
         #gc.collect()
@@ -108,16 +121,16 @@ class R_Actor(nn.Module):
         """
         list_obs = []
         for i in range(len(obs[0])):
-            obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in obs], self.grid_size).to(**self.tpdv)
+            obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
             list_obs.append(obs_to_add)
-        rnn_states = check(rnn_states, self.grid_size).to(**self.tpdv)
-        action = check(action, self.grid_size).to(**self.tpdv)
-        masks = check(masks, self.grid_size).to(**self.tpdv)
+        rnn_states = check(rnn_states, self.grid_size, self.device)
+        action = check(action, self.grid_size, self.device)
+        masks = check(masks, self.grid_size, self.device)
         if available_actions is not None:
-            available_actions = check(available_actions, self.grid_size).to(**self.tpdv)
+            available_actions = check(available_actions, self.grid_size, self.device)
 
         if active_masks is not None:
-            active_masks = check(active_masks, self.grid_size).to(**self.tpdv)
+            active_masks = check(active_masks, self.grid_size, self.device)
 
         actor_features = self.base(list_obs)
 
@@ -162,6 +175,7 @@ class R_Critic(nn.Module):
         self._recurrent_N = args.recurrent_N
         self._use_popart = args.use_popart
         self.tpdv = dict(dtype=torch.float32, device=device)
+        self.device = device
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][self._use_orthogonal]
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
@@ -193,10 +207,10 @@ class R_Critic(nn.Module):
         """
         list_cent_obs = []
         for i in range(len(cent_obs[0])):
-            cent_obs_to_add = check([sparse_tensor[i].astype(np.float32) for sparse_tensor in cent_obs], self.grid_size).to(**self.tpdv)
+            cent_obs_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size,self. device)
             list_cent_obs.append(cent_obs_to_add)
-        rnn_states = check(rnn_states, self.grid_size)
-        masks = check(masks, self.grid_size)
+        rnn_states = check(rnn_states, self.grid_size, self.device)
+        masks = check(masks, self.grid_size, self.device)
 
         critic_features = self.base(list_cent_obs)
 
@@ -206,8 +220,8 @@ class R_Critic(nn.Module):
         #torch.cuda.empty_cache()
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
-            rnn_states = rnn_states.to(**self.tpdv)
-            masks = masks.to(**self.tpdv)
+            rnn_states = rnn_states
+            masks = masks
             critic_features, rnn_states = self.rnn(critic_features, rnn_states, masks)
         values = self.v_out(critic_features)
 
