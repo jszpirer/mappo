@@ -20,7 +20,7 @@ class Scenario(BaseScenario):
             agent.name = 'agent %d' % i
             agent.collide = False
             agent.size = 0.15
-            agent.u_noise = args.wheel_noise
+            agent.u_noise = 0
             agent.max_speed = 0.51
         # speaker
         world.agents[0].movable = False
@@ -58,7 +58,7 @@ class Scenario(BaseScenario):
         # set random initial states
         for agent in world.agents:
             if agent.movable:
-                agent.state.p_pos = np.random.uniform(-3.85, +3.85, world.dim_p)
+                agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
             else:
                 agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
