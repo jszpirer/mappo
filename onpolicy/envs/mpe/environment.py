@@ -16,7 +16,8 @@ class MultiAgentEnv(gym.Env):
     }
 
     def __init__(self, world, reset_callback=None, reward_callback=None,
-                 observation_callback=None, info_callback=None,
+                 observation_callback=None, critic_observation_callback=None,
+                 info_callback=None,
                  done_callback=None, post_step_callback=None,
                  shared_viewer=True, discrete_action=True):
 
@@ -30,6 +31,7 @@ class MultiAgentEnv(gym.Env):
         self.reset_callback = reset_callback
         self.reward_callback = reward_callback
         self.observation_callback = observation_callback
+        self.critic_observation_callback = critic_observation_callback
         self.info_callback = info_callback
         self.done_callback = done_callback
 
@@ -135,6 +137,9 @@ class MultiAgentEnv(gym.Env):
             self._set_action(action_n[i], agent, self.action_space[i])
         # advance world state
         self.world.step()  # core.step()
+        # if the critic gets the full view of the arena, record observation for the critic
+        if self.word.omniscient_critic:
+            obs_n.append(self._get_critic_obs())
         # record observation for each agent
         for i, agent in enumerate(self.agents):
             obs_n.append(self._get_obs(agent))
@@ -168,7 +173,8 @@ class MultiAgentEnv(gym.Env):
         # record observations for each agent
         obs_n = []
         self.agents = self.world.policy_agents
-
+        if self.word.omniscient_critic:
+            obs_n.append(self._get_critic_obs())
         for agent in self.agents:
             obs_n.append(self._get_obs(agent))
 
@@ -196,6 +202,12 @@ class MultiAgentEnv(gym.Env):
         if self.observation_callback is None:
             return np.zeros(0)
         return self.observation_callback(agent, self.world)
+
+    # get the full observation for the critic
+    def _get_critic_obs(self):
+        if self.observation_callback is None:
+            return np.zeros(0)
+        return self.critic_observation_callback(self.world)
 
     # get dones for a particular agent
     # unused right now -- agents are allowed to go beyond the viewing screen

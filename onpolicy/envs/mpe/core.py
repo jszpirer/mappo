@@ -142,6 +142,7 @@ class World(object):
         self.one_reward = False
         self.grid_resolution = 0
         self.nb_additional_data = 0
+        self.omniscient_critic = False
 
     # return all entities in the world
     @property

@@ -29,7 +29,6 @@ class MPERunner(Runner):
         for episode in range(episodes):
             for it in range(iterations_before_training):
                 if self.use_linear_lr_decay:
-                    print("here mpe_runner")
                     self.trainer.policy.lr_decay(episode, episodes)
                 
                 score = 0
@@ -162,6 +161,8 @@ class MPERunner(Runner):
         # replay buffer
         if self.use_centralized_V:
             if len(obs[0][0].shape) == 2:
+                if self.world.omniscient_critic:
+                    share_obs = 
                 share_obs = obs.reshape(self.n_rollout_threads, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
             else:
