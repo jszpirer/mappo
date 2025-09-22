@@ -164,6 +164,11 @@ def worker(remote, parent_remote, env_fn_wrapper):
         elif cmd == 'reset_task':
             ob = env.reset_task()
             remote.send(ob)
+        elif cmd == 'get_state':
+            remote.send(env.get_state())
+        elif cmd == 'set_state':
+            env.set_state(data)
+            remote.send(None)
         elif cmd == 'close':
             env.close()
             remote.close()
@@ -295,6 +300,17 @@ class SubprocVecEnv(ShareVecEnv):
         for p in self.ps:
             p.join()
         self.closed = True
+
+    def get_env_states(self):
+        for remote in self.remotes:
+            remote.send(('get_state', None))
+        return [remote.recv() for remote in self.remotes]
+
+    def set_env_states(self, states):
+        for remote, state in zip(self.remotes, states):
+            remote.send(('set_state', state))
+        for remote in self.remotes:
+            remote.recv()
 
     def render(self, mode="rgb_array"):
         for remote in self.remotes:

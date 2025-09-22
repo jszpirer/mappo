@@ -3,6 +3,7 @@ from gym import spaces
 from gym.envs.registration import EnvSpec
 import numpy as np
 from .multi_discrete import MultiDiscrete
+import copy
 
 # update bounds to center around agent
 cam_range = 2
@@ -172,6 +173,17 @@ class MultiAgentEnv(gym.Env):
             obs_n.append(self._get_obs(agent))
 
         return obs_n
+
+    def get_state(self):
+        return {
+            "world": copy.deepcopy(self.world),
+            "current_step": self.current_step
+        }
+    
+    def set_state(self, state):
+        self.world = copy.deepcopy(state["world"])
+        self.agents = self.world.policy_agents
+        self.current_step = state["current_step"]
 
     # get info used for benchmarking
     def _get_info(self, agent):
