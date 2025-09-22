@@ -71,13 +71,7 @@ class R_Actor(nn.Module):
         :return action_log_probs: (torch.Tensor) log probabilities of taken actions.
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
-        #print("Before list")
-        #print(f"Allouee : {torch.cuda.memory_allocated() / 1024**2:.2f} MMB")
-        #print(f"Reservee : {torch.cuda.memory_reserved() / 1024**2:.2f} MMB")
         list_obs = []
-        #with ProcessPoolExecutor() as executor:
-            #futures = [executor.submit(process_single_obs, i, obs, self.grid_size, self.device) for i in range(len(obs[0]))]
-            #list_obs = [f.result() for f in futures]
         for i in range(len(obs[0])):
             obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
             list_obs.append(obs_to_add)
@@ -94,14 +88,6 @@ class R_Actor(nn.Module):
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
 
         actions, action_log_probs = self.act(actor_features, available_actions, deterministic)
-
-        #actions = actions.to(torch.device("cpu"))
-        #action_log_probs = action_log_probs.to(torch.device("cpu"))
-        #rnn_states = rnn_states.to(torch.device("cpu"))
-        # Removing the list of observations because useless
-        #del list_obs
-        #gc.collect()
-        #torch.cuda.empty_cache()
 
         return actions, action_log_probs, rnn_states
 
@@ -213,11 +199,6 @@ class R_Critic(nn.Module):
         masks = check(masks, self.grid_size, self.device)
 
         critic_features = self.base(list_cent_obs)
-
-        # Removing the list of observations because useless
-        #del list_cent_obs
-        #gc.collect()
-        #torch.cuda.empty_cache()
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             rnn_states = rnn_states
