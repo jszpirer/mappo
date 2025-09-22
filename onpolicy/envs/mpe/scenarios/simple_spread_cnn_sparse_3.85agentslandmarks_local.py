@@ -9,7 +9,7 @@ class Scenario(BaseScenario):
         world.world_length = args.episode_length
         # set any world properties first
         world.dim_c = 2
-        world.limit = 4
+        world.limit = 3.75
         world.num_agents = args.num_agents
         world.num_landmarks = args.num_landmarks  # 3
         world.collaborative = True
@@ -42,11 +42,11 @@ class Scenario(BaseScenario):
 
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-3.85, +3.85, world.dim_p)
+            agent.state.p_pos = np.random.uniform(-3.6, +3.6, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = 0.8 * np.random.uniform(-3.85, +3.85, world.dim_p)
+            landmark.state.p_pos = 0.8 * np.random.uniform(-3.6, +3.6, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
     def benchmark_data(self, agent, world):
@@ -93,7 +93,7 @@ class Scenario(BaseScenario):
         entity_pos = np.zeros((2, world.num_landmarks))
         j = 0
         for i, entity in enumerate(world.landmarks):  # world.entities:
-            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= 3:
+            if np.linalg.norm(entity.state.p_pos - agent.state.p_pos) <= 2.14:
                 distance = entity.state.p_pos - agent.state.p_pos
                 coef = world.grid_resolution/(world.limit*4)
                 scale = (world.grid_resolution//2) - 1
@@ -110,7 +110,7 @@ class Scenario(BaseScenario):
         for other in world.agents:
             if other is agent:
                 continue
-            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= 3:
+            if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= 2.14:
                 distance = other.state.p_pos - agent.state.p_pos
                 coef = world.grid_resolution/(world.limit*4)
                 scale = (world.grid_resolution//2) - 1

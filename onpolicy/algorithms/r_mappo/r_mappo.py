@@ -113,11 +113,11 @@ class R_MAPPO():
             value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, \
             adv_targ, available_actions_batch, _ = sample
 
-        old_action_log_probs_batch = check(old_action_log_probs_batch, self.grid_size).to(**self.tpdv)
-        adv_targ = check(adv_targ, self.grid_size).to(**self.tpdv)
-        value_preds_batch = check(value_preds_batch, self.grid_size).to(**self.tpdv)
-        return_batch = check(return_batch, self.grid_size).to(**self.tpdv)
-        active_masks_batch = check(active_masks_batch, self.grid_size).to(**self.tpdv)
+        old_action_log_probs_batch = check(old_action_log_probs_batch, self.grid_size, self.device)
+        adv_targ = check(adv_targ, self.grid_size, self.device)
+        value_preds_batch = check(value_preds_batch, self.grid_size, self.device)
+        return_batch = check(return_batch, self.grid_size, self.device)
+        active_masks_batch = check(active_masks_batch, self.grid_size, self.device)
 
         # Reshape to do in a single forward pass for all steps
         values, action_log_probs, dist_entropy = self.policy.evaluate_actions(share_obs_batch,

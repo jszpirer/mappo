@@ -4,6 +4,8 @@ import numpy as np
 import torch
 from tensorboardX import SummaryWriter
 from onpolicy.utils.shared_buffer import SharedReplayBuffer
+import pickle
+import random
 
 def _t2n(x):
     """Convert torch tensor to a numpy array."""
@@ -28,11 +30,13 @@ class Runner(object):
         self.env_name = self.all_args.env_name
         self.algorithm_name = self.all_args.algorithm_name
         self.experiment_name = self.all_args.experiment_name
+        self.curriculum_start = self.all_args.curriculum_start
         self.use_centralized_V = self.all_args.use_centralized_V
         self.use_obs_instead_of_state = self.all_args.use_obs_instead_of_state
         self.num_env_steps = self.all_args.num_env_steps
         self.episode_length = self.all_args.episode_length
         self.n_rollout_threads = self.all_args.n_rollout_threads
+        self.batch_size = self.all_args.batch_size
         self.n_eval_rollout_threads = self.all_args.n_eval_rollout_threads
         self.n_render_rollout_threads = self.all_args.n_render_rollout_threads
         self.use_linear_lr_decay = self.all_args.use_linear_lr_decay
@@ -94,6 +98,10 @@ class Runner(object):
                                         share_observation_space,
                                         self.envs.action_space[0])
 
+        if self.model_dir is not None:
+            self.restore_metadata(self.model_dir)
+
+
     def run(self):
         """Collect training data, perform training updates, and evaluate policy."""
         raise NotImplementedError
@@ -126,7 +134,7 @@ class Runner(object):
             next_values = self.trainer.policy.get_values(np.concatenate(self.buffer.share_obs[-1]),
                                                         np.concatenate(self.buffer.rnn_states_critic[-1]),
                                                         np.concatenate(self.buffer.masks[-1]))
-        next_values = np.array(np.split(_t2n(next_values), self.n_rollout_threads))
+        next_values = np.array(np.split(_t2n(next_values), self.batch_size))
         self.buffer.compute_returns(next_values, self.trainer.value_normalizer)
     
     def train(self):
@@ -145,6 +153,33 @@ class Runner(object):
             torch.save(policy_actor.state_dict(), str(self.save_dir) + "/actor.pt")
             policy_critic = self.trainer.policy.critic
             torch.save(policy_critic.state_dict(), str(self.save_dir) + "/critic.pt")
+            random_state = random.getstate()
+            np_random_state = np.random.get_state()
+            torch_random_state = torch.get_rng_state()
+            torch_cuda_random_state = torch.cuda.get_rng_state() if torch.cuda.is_available() else None
+            env_states = self.envs.get_env_states()
+            checkpoint = {
+                'policy_meta': {
+                    'actor_optimizer_state_dict': self.trainer.policy.actor_optimizer.state_dict(),
+                    'critic_optimizer_state_dict': self.trainer.policy.critic_optimizer.state_dict(),
+                    'lr': self.trainer.policy.lr,
+                    'critic_lr': self.trainer.policy.critic_lr,
+                    'opti_eps': self.trainer.policy.opti_eps,
+                    'weight_decay': self.trainer.policy.weight_decay
+                },
+                'buffer': self.buffer,
+                'value_norm_state': self.trainer.value_normalizer,
+                'envs' : env_states,
+                'random_states': {
+                    'random': random_state,
+                    'numpy': np_random_state,
+                    'torch': torch_random_state,
+                    'torch_cuda': torch_cuda_random_state
+                }
+            }
+            with open(str(self.save_dir)+ "/checkpoint.pt", "wb") as f:
+                pickle.dump(checkpoint, f)
+                print(f"✅ Sauvegarde réussie dans {str(self.save_dir)}/checkpoint.pt")
 
     def restore(self, model_dir):
         """Restore policy's networks from a saved model."""
@@ -153,13 +188,39 @@ class Runner(object):
         else:
             policy_actor_state_dict = torch.load(str(self.model_dir) + '/actor.pt')
             import imageio
-            self.gif_dir = str(self.run_dir / 'gifs')
+            self.gif_dir = str(str(self.run_dir) + '/gifs')
             if not os.path.exists(self.gif_dir):
                 os.makedirs(self.gif_dir)
             self.policy.actor.load_state_dict(policy_actor_state_dict)
             if not self.all_args.use_render:
                 policy_critic_state_dict = torch.load(str(self.model_dir) + '/critic.pt')
                 self.policy.critic.load_state_dict(policy_critic_state_dict)
+
+    def restore_metadata(self, model_dir):
+        if not self.all_args.use_render:
+            with open(str(self.model_dir) + "/checkpoint.pt", "rb") as f:
+                checkpoint = pickle.load(f)
+            self.trainer.restored = True
+            self.trainer.policy.actor_optimizer.load_state_dict(checkpoint['policy_meta']['actor_optimizer_state_dict'])
+            self.trainer.state_dict_actor = checkpoint['policy_meta']['actor_optimizer_state_dict']
+            self.trainer.policy.critic_optimizer.load_state_dict(checkpoint['policy_meta']['critic_optimizer_state_dict'])
+            self.trainer.state_dict_critic = checkpoint['policy_meta']['critic_optimizer_state_dict']
+            self.trainer.policy.lr = checkpoint['policy_meta']['lr']
+            self.trainer.policy.critic_lr = checkpoint['policy_meta']['critic_lr']
+            self.trainer.policy.opti_eps = checkpoint['policy_meta']['opti_eps']
+            self.trainer.policy.weight_decay = checkpoint['policy_meta']['weight_decay']
+            self.trainer.value_normalizer = checkpoint['value_norm_state']
+            self.buffer = checkpoint['buffer']
+            random.setstate(checkpoint['random_states']['random'])
+            np.random.set_state(checkpoint['random_states']['numpy'])
+            torch.set_rng_state(checkpoint['random_states']['torch'])
+            if torch.cuda.is_available() and checkpoint['random_states']['torch_cuda'] is not None:
+                torch.cuda.set_rng_state(checkpoint['random_states']['torch_cuda'])
+            self.envs.reset()
+            env_states = checkpoint["envs"]
+            self.envs.set_env_states(env_states)
+            print(f"✅ Load réussi")
+ 
 
     def log_train(self, train_infos, total_num_steps):
         """

@@ -68,11 +68,11 @@ class SimplSparseSpreadCNN(nn.Module):
         self.fc = nn.Linear(in_features=self.size * self.size, out_features=output_size)
 
     def forward(self, x):
-        set_printoptions(threshold=inf)
+        #set_printoptions(threshold=inf)
 
-        sparse = x
-        indices = sparse.coalesce().indices().permute(1, 0).contiguous().int()
-        values = sparse.coalesce().values().view(-1, 1)
+        sparse = x.coalesce()
+        indices = sparse.indices().permute(1, 0).contiguous().int()
+        values = sparse.values().view(-1, 1)
         sparse = spconv.SparseConvTensor(values, indices, x.size()[1:], batch_size = x.size()[0])
 
         # Apply convolutional layers to each sparse tensor
