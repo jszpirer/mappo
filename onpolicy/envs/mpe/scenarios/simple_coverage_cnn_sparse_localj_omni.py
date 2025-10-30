@@ -1,4 +1,5 @@
 import numpy as np
+from math import ceil, cos, sin, pi
 from onpolicy.envs.mpe.core import World, Agent, Landmark
 from onpolicy.envs.mpe.scenario import BaseScenario
 
@@ -13,7 +14,11 @@ class Scenario(BaseScenario):
         world.num_agents = args.num_agents
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
+        world.grid_resolution_critic = args.grid_resolution_critic
         world.nb_additional_data = args.nb_additional_data
+        world.omniscient_critic = True
+        world.use_directions = args.use_directions
+        world.discrete_actions = args.discrete_action
         # add agents
         world.agents = [Agent() for i in range(world.num_agents)]
         for i, agent in enumerate(world.agents):
@@ -23,6 +28,11 @@ class Scenario(BaseScenario):
             agent.size = 0.15
             # agent.u_noise = 1
             agent.max_speed = 0.51
+            if not world.discrete_actions:
+                agent.u_range = agent.max_speed
+            if world.use_directions:
+                agent.direction = np.random.uniform(0, 2 * np.pi, 1)
+                agent.direction = np.mod(agent.direction, 2 * np.pi)
         self.reset_world(world)
         return world
 
@@ -71,7 +81,6 @@ class Scenario(BaseScenario):
         return rew
 
     def observation(self, agent, world):
-
         other_pos = np.zeros((2, world.num_agents))
         i = 0
         j = 0
@@ -80,6 +89,11 @@ class Scenario(BaseScenario):
                 continue
             if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= 3:
                 distance = other.state.p_pos - agent.state.p_pos
+                if agent.direction is not None:
+                    new_distance = np.zeros(2)
+                    new_distance[0] = cos(agent.direction) * distance[0] - sin(agent.direction) * distance[1]
+                    new_distance[1] = sin(agent.direction) * distance[0] + cos(agent.direction) * distance[1]
+                    distance = new_distance
                 coef = world.grid_resolution/(world.limit*4)
                 scale = (world.grid_resolution//2) - 1
                 other_pos[0][i] = round(coef*distance[0]) + scale
@@ -92,6 +106,27 @@ class Scenario(BaseScenario):
         
         observations = np.empty([2], dtype=object)
         observations[:] = [agent.state.p_vel, other_pos]
+        return observations
+    
+    def critic_observation(self, world):
+        # For velocities, need to know in which liste the indices of the grid are
+        agents_vel_x = np.zeros((world.num_agents + 1))
+        agents_vel_x[0] = 2
+        agents_vel_y = np.zeros((world.num_agents + 1))
+        agents_vel_y[0] = 2
+        other_pos = np.zeros((2, world.num_agents))
+        i = 0
+        for other in world.agents:
+            agents_vel_x[i + 1] = other.state.p_vel[0]
+            agents_vel_y[i + 1] = other.state.p_vel[1]
+            distance = other.state.p_pos
+            coef = int(ceil(world.grid_resolution/2)/(world.limit*2))
+            scale = int((ceil(world.grid_resolution/2)//2)) - 1
+            other_pos[0][i] = round(coef*distance[0]) + scale
+            other_pos[1][i] = round(coef*distance[1]) + scale
+            i += 1
+        observations = np.empty([3], dtype=object)
+        observations[:] = [agents_vel_x, agents_vel_y, other_pos]
         return observations
     
     

@@ -239,6 +239,52 @@ class FilledPolygon(Geom):
             glVertex3f(p[0], p[1],0)  # draw each vertex
         glEnd()
 
+def Arrow(Geom):
+    def __init__(self, start=(0.0, 0.0), direction=0.0, length=1.0, head_length=0.1, head_width=0.05):
+        Geom.__init__(self)
+        self.start = start
+        self.direction = direction
+        self.length = length
+        self.head_length = head_length
+        self.head_width = head_width
+        self.linewidth = LineWidth(1)
+        self.add_attr(self.linewidth)
+
+    def render1(self):
+        # Convert angle to vector
+        dx = np.sin(self.direction) * self.length
+        dy = np.cos(self.direction) * self.length
+        end = self.start + np.array([dx, dy])
+        
+        # Draw the main line
+        glBegin(GL_LINES)
+        glVertex2f(*self.start)
+        glVertex2f(*end)
+        glEnd()
+
+        # Compute arrowhead
+        directionvec = end - self.start
+        norm = np.linalg.norm(directionvec)
+        if norm == 0:
+            return
+        
+        unit_dir = directionvec / norm
+        head_base = end - unit_dir * self.head_length
+        perp = np.array([-unit_dir[1], unit_dir[0]]) * self.head_width
+        left = head_base + perp
+        right = head_base - perp
+
+        # Draw arrow head
+        glBegin(GL_TRIANGLES)
+        glVertex2f(*end)
+        glVertex2f(*left)
+        glVertex2f(*right)
+        glEnd()
+
+    def set_linewidth(self, x):
+        self.linewidth.stroke = x
+
+
 def make_circle(radius=10, res=30, filled=True):
     points = []
     for i in range(res):
@@ -255,6 +301,9 @@ def make_polygon(v, filled=True):
 
 def make_polyline(v):
     return PolyLine(v, False)
+
+def make_arrow(start, direction, length):
+    return Arrow(start, direction, length)
 
 def make_capsule(length, width):
     l, r, t, b = 0, length, width/2, -width/2

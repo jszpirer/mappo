@@ -32,6 +32,7 @@ class Runner(object):
         self.experiment_name = self.all_args.experiment_name
         self.curriculum_start = self.all_args.curriculum_start
         self.use_centralized_V = self.all_args.use_centralized_V
+        self.omniscient_critic = self.all_args.omniscient_critic
         self.use_obs_instead_of_state = self.all_args.use_obs_instead_of_state
         self.num_env_steps = self.all_args.num_env_steps
         self.episode_length = self.all_args.episode_length
@@ -74,7 +75,10 @@ class Runner(object):
             from onpolicy.algorithms.r_mappo.r_mappo import R_MAPPO as TrainAlgo
             from onpolicy.algorithms.r_mappo.algorithm.rMAPPOPolicy import R_MAPPOPolicy as Policy
 
-        share_observation_space = self.envs.share_observation_space[0] if self.use_centralized_V else self.envs.observation_space[0]
+        if self.omniscient_critic:
+            share_observation_space = self.envs.share_observation_space if self.use_centralized_V else self.envs.observation_space[0]
+        else:
+            share_observation_space = self.envs.share_observation_space[0] if self.use_centralized_V else self.envs.observation_space[0]
         
         # policy network
         if self.algorithm_name == "mat" or self.algorithm_name == "mat_dec":
@@ -131,7 +135,12 @@ class Runner(object):
                                                         np.concatenate(self.buffer.rnn_states_critic[-1]),
                                                         np.concatenate(self.buffer.masks[-1]))
         else:
-            next_values = self.trainer.policy.get_values(np.concatenate(self.buffer.share_obs[-1]),
+            if self.omniscient_critic:
+                next_values = self.trainer.policy.get_values(self.buffer.share_obs[-1][:, 0, :],
+                                                        self.buffer.rnn_states_critic[-1][:, 0, :],
+                                                        np.concatenate(self.buffer.masks[-1]))
+            else:
+                next_values = self.trainer.policy.get_values(np.concatenate(self.buffer.share_obs[-1]),
                                                         np.concatenate(self.buffer.rnn_states_critic[-1]),
                                                         np.concatenate(self.buffer.masks[-1]))
         next_values = np.array(np.split(_t2n(next_values), self.batch_size))

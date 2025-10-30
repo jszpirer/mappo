@@ -26,7 +26,7 @@ def init(module, weight_init, bias_init, gain=1):
 def get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
-def check(input, grid_size, device):
+def check(input, grid_size, device, list_values=None):
     if isinstance(input, torch.Tensor):
         return input.to(device)
     if isinstance(input, np.ndarray):
@@ -35,9 +35,6 @@ def check(input, grid_size, device):
         return torch.from_numpy(input).to(device)
     if len(input[0].shape) == 1:
         return torch.tensor(np.array(input, dtype=np.float32)).to(device)
-    
-    # Flatten the list of lists
-    flattened_sparse_tensors = input
 
     #Étape 1 : calcul du nombre total d'éléments
     lengths = np.array([len(x[0]) for x in input], dtype=np.int32)
@@ -52,7 +49,10 @@ def check(input, grid_size, device):
     batch_indices = torch.from_numpy(batch_indices_np).to(device)
     x_indices = torch.from_numpy(x_indices_np).to(device)
     y_indices = torch.from_numpy(y_indices_np).to(device)
-    values = torch.ones(total, dtype=torch.float32, device=device)
+    if list_values is None:
+        values = torch.ones(total, dtype=torch.float32, device=device)
+    else:
+        values = torch.from_numpy(np.concatenate(list_values)).to(device)
     
     indices = torch.stack([batch_indices, x_indices, y_indices], dim=0)
     shape = (len(input), grid_size, grid_size)

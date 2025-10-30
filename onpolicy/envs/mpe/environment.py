@@ -39,7 +39,7 @@ class MultiAgentEnv(gym.Env):
 
         # environment parameters
         # self.discrete_action_space = True
-        self.discrete_action_space = discrete_action
+        self.discrete_action_space = world.discrete_actions
 
         # if true, action is a number 0...N, otherwise action is a one-hot N-dimensional vector
         self.discrete_action_input = False
@@ -97,15 +97,20 @@ class MultiAgentEnv(gym.Env):
                 low=-np.inf, high=+np.inf, shape=obs_dim, dtype=np.float32))  # [-inf,inf]
             agent.action.c = np.zeros(self.world.dim_c)
         
-        
+        if self.world.omniscient_critic:
+            share_obs_dim = critic_observation_callback(self.world).shape
         share_obs_dim_shape = 0
         if len(obs_dim) > 1:
             share_obs_dim_shape = (share_obs_dim, obs_dim[1])
         else:
             share_obs_dim_shape = (share_obs_dim,)
         
-        self.share_observation_space = [spaces.Box(
-            low=-np.inf, high=+np.inf, shape=share_obs_dim_shape, dtype=np.float32) for _ in range(self.n)]
+        if self.world.omniscient_critic:
+            self.share_observation_space = spaces.Box(
+                low=-np.inf, high=+np.inf, shape=share_obs_dim, dtype=np.float32)
+        else:
+            self.share_observation_space = [spaces.Box(
+                low=-np.inf, high=+np.inf, shape=share_obs_dim_shape, dtype=np.float32) for _ in range(self.n)]
         
         # rendering
         self.shared_viewer = shared_viewer
@@ -138,7 +143,7 @@ class MultiAgentEnv(gym.Env):
         # advance world state
         self.world.step()  # core.step()
         # if the critic gets the full view of the arena, record observation for the critic
-        if self.word.omniscient_critic:
+        if self.world.omniscient_critic:
             obs_n.append(self._get_critic_obs())
         # record observation for each agent
         for i, agent in enumerate(self.agents):
@@ -173,7 +178,7 @@ class MultiAgentEnv(gym.Env):
         # record observations for each agent
         obs_n = []
         self.agents = self.world.policy_agents
-        if self.word.omniscient_critic:
+        if self.world.omniscient_critic:
             obs_n.append(self._get_critic_obs())
         for agent in self.agents:
             obs_n.append(self._get_obs(agent))
@@ -271,6 +276,8 @@ class MultiAgentEnv(gym.Env):
             if agent.accel is not None:
                 sensitivity = agent.accel
             agent.action.u *= sensitivity
+            #print("Petit test ici pour savoir a quoi ressemble action.u")
+            #print(agent.action.u)
 
             if (not agent.silent) and (not isinstance(action_space, MultiDiscrete)):
                 action[0] = action[0][d:]
@@ -334,6 +341,7 @@ class MultiAgentEnv(gym.Env):
             # import rendering only if we need it (and don't import for headless machines)
             #from gym.envs.classic_control import rendering
             from . import rendering
+            from rendering import Arrow
             self.render_geoms = []
             self.render_geoms_xform = []
 
@@ -348,6 +356,16 @@ class MultiAgentEnv(gym.Env):
                 if 'agent' in entity.name:
                     geom.set_color(*entity.color, alpha=0.5)
 
+                    if self.world.use_directions:
+                        direction = entity.direction
+                        arrow = Arrow(start=(entity.state.p_pos[0], entity.state.p_pos[1]),
+                                        direction=entity.direction,
+                                        length=entity.size * 1.5,
+                                        head_length=entity.size * 0.5,
+                                        head_width=entity.size * 0.3)
+                        arrow.set_linewidth(0.5)
+                        arrow.add_attr(xform)
+                        self.render_geoms.append(arrow)                                     
                     if not entity.silent:
                         dim_c = self.world.dim_c
                         # make circles to represent communication

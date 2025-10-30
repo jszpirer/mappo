@@ -42,6 +42,7 @@ class SharedReplayBuffer(object):
         self._use_proper_time_limits = args.use_proper_time_limits
         self.algo = args.algorithm_name
         self.num_agents = num_agents
+        self.omniscient_critic = args.omniscient_critic
 
         obs_shape = get_shape_from_obs_space(obs_space)
         share_obs_shape = get_shape_from_obs_space(cent_obs_space)
@@ -51,7 +52,6 @@ class SharedReplayBuffer(object):
 
         if type(share_obs_shape[-1]) == list:
             share_obs_shape = share_obs_shape[:1]
-
         
         self.share_obs = np.empty((self.episode_length + 1, self.batch_size, num_agents, *share_obs_shape),
                                   dtype=object)
@@ -520,8 +520,8 @@ class SharedReplayBuffer(object):
             share_obs = self.share_obs[:-1].transpose(1, 2, 0, 3, 4, 5).reshape(-1, *self.share_obs.shape[3:])
             obs = self.obs[:-1].transpose(1, 2, 0, 3, 4, 5).reshape(-1, *self.obs.shape[3:])
         else:
-            share_obs = _cast(self.share_obs[:-1])
             obs = _cast(self.obs[:-1])
+            share_obs = _cast(self.share_obs[:-1])
 
         actions = _cast(self.actions)
         action_log_probs = _cast(self.action_log_probs)
@@ -607,7 +607,7 @@ class SharedReplayBuffer(object):
             active_masks_batch = _flatten(L, N, active_masks_batch)
             old_action_log_probs_batch = _flatten(L, N, old_action_log_probs_batch)
             adv_targ = _flatten(L, N, adv_targ)
-
+            
             yield share_obs_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch,\
                   value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch,\
                   adv_targ, available_actions_batch

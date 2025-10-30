@@ -2,7 +2,6 @@
 Modified from OpenAI Baselines code to work with multi-agent envs
 """
 import numpy as np
-import torch
 from multiprocessing import Process, Pipe
 from abc import ABC, abstractmethod
 from onpolicy.utils.util import tile_images
@@ -274,13 +273,7 @@ class SubprocVecEnv(ShareVecEnv):
         for remote in self.remotes:
             remote.send(('reset', None))
         obs = [remote.recv() for remote in self.remotes]
-        print("Shape before stack: " + str(len(obs)))
-        print(len(obs[0]))
-        print(obs[0][0].shape)
-        print(obs[0][1].shape)
         stacked = np.array(obs, dtype=object)
-        print("Shape after stack")
-        print(stacked.shape)
         return stacked
 
 

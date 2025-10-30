@@ -1,22 +1,22 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_coverage_cnn_sparse_localj" 
+scenario="rvr_dispersion_local_omni_walls" 
 num_landmarks=0
 num_agents=5
-grid_resolution=77
-grid_resolution_critic=77
+grid_resolution=81
+grid_resolution_critic=81
 nb_additional_data=2
 noise=0
 stride=2
-kernel=7
+kernel=9
 algo="rmappo" #"mappo" "ippo"
-exp="simple_coverage_cnn_sparse77_local_withoutnoise_test"
+exp="rvr_local_omni"
 seed_max=10
-project="simple_coverage_5agents"
+project="rvr_dispersion_walls"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in `seq ${seed_max}`;
+for seed in 1
 do
     echo "seed is ${seed}:"
     TORCH_USE_CUDA_DSA=1 CUDA_LAUNCH_BLOCKING=1 CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
@@ -24,5 +24,5 @@ do
     --n_training_threads 1 --n_rollout_threads 128 --num_mini_batch 1 --episode_length 125 --num_env_steps 100000000 \
     --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
     --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --wheel_noise ${noise} \
-    --stride ${stride} --kernel ${kernel} --save_interval 1000000 --grid_resolution_critic ${grid_resolution_critic}
+    --stride ${stride} --kernel ${kernel} --save_interval 1000000 --grid_resolution_critic ${grid_resolution_critic} --omniscient_critic --use_directions --dim_actor 4
 done
