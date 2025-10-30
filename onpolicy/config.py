@@ -50,6 +50,10 @@ def get_config():
             by default True, all agents will share the same network; set to make training agents use different policies. 
         --use_centralized_V
             by default True, use centralized training mode; or else will decentralized training mode.
+        --omniscient_critic
+            by default False, use a concatenation of agent's obs for the critic; or else use a full view of the arena.
+        --dim_actor
+            by default 2, number of different types of information given to the actor
         --stacked_frames <int>
             Number of input frames which should be stack together.
         --hidden_size <int>
@@ -195,6 +199,10 @@ def get_config():
                         default=True, help='Whether agent share the same policy')
     parser.add_argument("--use_centralized_V", action='store_false',
                         default=True, help="Whether to use centralized V function")
+    parser.add_argument("--omniscient_critic", action='store_true',
+                        default=False, help="Whether to use concatenation of agent's obs for the critic")
+    parser.add_argument("--dim_actor", type=int, default=2,
+                        help="Number of different information given to the actor")
     parser.add_argument("--stacked_frames", type=int, default=1,
                         help="Dimension of hidden layers for actor/critic networks")
     parser.add_argument("--use_stacked_frames", action='store_true',

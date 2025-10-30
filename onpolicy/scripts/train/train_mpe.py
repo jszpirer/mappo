@@ -56,6 +56,7 @@ def parse_args(args, parser):
     parser.add_argument('--num_agents', type=int,
                         default=2, help="number of players")
     parser.add_argument("--grid_resolution", type=int, default=0)
+    parser.add_argument("--grid_resolution_critic", type=int, default=0)
     parser.add_argument("--nb_additional_data", type=int, default=0)
     parser.add_argument("--wheel_noise", type=float, default=0)
     parser.add_argument("--range_noise", type=float, default=0)
@@ -68,6 +69,10 @@ def parse_args(args, parser):
     parser.add_argument("--curriculum_start", type=int, default=0)
     parser.add_argument("--obs_range", type=float, default=3)
     parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--use_directions", action='store_true',
+                        default=False, help="Whether to use directions for the particles or not")
+    parser.add_argument("--discrete_action", action='store_false',
+                        default=True, help="Whether to use discrete actions or not")
 
     all_args = parser.parse_known_args(args)[0]
 
@@ -153,9 +158,6 @@ def main(args):
     eval_envs = make_eval_env(all_args) if all_args.use_eval else None
     num_agents = all_args.num_agents
 
-    print("after initialization")
-    print(all_args.grid_resolution)
-
     config = {
         "all_args": all_args,
         "envs": envs,
@@ -173,11 +175,6 @@ def main(args):
 
     runner = Runner(config)
     runner.run()
-    
-    # post process
-    envs.close()
-    if all_args.use_eval and eval_envs is not envs:
-        eval_envs.close()
 
     if all_args.use_wandb:
         runner.save()
@@ -185,6 +182,11 @@ def main(args):
     else:
         runner.writter.export_scalars_to_json(str(runner.log_dir + '/summary.json'))
         runner.writter.close()
+
+    # post process
+    envs.close()
+    if all_args.use_eval and eval_envs is not envs:
+        eval_envs.close()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import numpy as np
 import seaborn as sns
+from math import cos, sin
 
 # physical/external base state of all entites
 class EntityState(object):
@@ -26,14 +27,12 @@ class Action(object):
 
 # properties of wall entities
 class Wall(object):
-    def __init__(self, orient='H', axis_pos=0.0, endpoints=(-1, 1), width=0.1,
+    def __init__(self, startpoint=(0, 0), endpoint=(0, 0), width=0.1,
                  hard=True):
-        # orientation: 'H'orizontal or 'V'ertical
-        self.orient = orient
-        # position along axis which wall lays on (y-axis for H, x-axis for V)
-        self.axis_pos = axis_pos
-        # endpoints of wall (x-coords for H, y-coords for V)
-        self.endpoints = np.array(endpoints)
+        # startpoint of wall
+        self.start = np.array(startpoint)
+        # endpoint of wall 
+        self.end = np.array(endpoint)
         # width of wall
         self.width = width
         # whether wall is impassable to all agents
@@ -108,6 +107,8 @@ class Agent(Entity):
         self.action_callback = None
         # zoe 20200420
         self.goal = None
+        # agents can have a direction
+        self.direction = None
 
 # multi-agent world
 class World(object):
@@ -141,8 +142,10 @@ class World(object):
         self.num_landmarks = 0
         self.one_reward = False
         self.grid_resolution = 0
+        self.grid_resolution_critic = 0
         self.nb_additional_data = 0
         self.omniscient_critic = False
+        self.discrete_actions = True
 
     # return all entities in the world
     @property
@@ -240,6 +243,12 @@ class World(object):
                 # force = mass * a * action + n
                 p_force[i] = (
                     agent.mass * agent.accel if agent.accel is not None else agent.mass) * agent.action.u + noise
+                # if the agent has a specific direction, the force should take it into account
+                if self.use_directions:
+                    x = p_force[i][0]
+                    y = p_force[i][1]
+                    p_force[i][0] = cos(agent.direction) * x + sin(agent.direction) * y
+                    p_force[i][1] = -sin(agent.direction) * x + cos(agent.direction) * y
         return p_force
 
     # gather physical forces acting on entities
@@ -281,6 +290,10 @@ class World(object):
                     entity.state.p_vel = entity.state.p_vel / np.sqrt(np.square(entity.state.p_vel[0]) +
                                                                       np.square(entity.state.p_vel[1])) * entity.max_speed
             entity.state.p_pos += entity.state.p_vel * self.dt
+            if self.use_directions:
+                # New direction after the moving step
+                entity.direction = np.arctan2(entity.state.p_vel[0], entity.state.p_vel[1])
+                entity.direction = np.mod(entity.direction, 2 * np.pi)
             if abs(entity.state.p_pos[0]) > (self.limit - entity.size):
                 if entity.state.p_pos[0] > (self.limit - entity.size):
                     entity.state.p_pos[0] = self.limit - entity.size
@@ -325,7 +338,6 @@ class World(object):
         k = self.contact_margin
         penetration = np.logaddexp(0, -(dist - dist_min)/k)*k
         if dist == 0:
-            print("Dist is 0")
             dist = 0.01
         force = self.contact_force * delta_pos / dist * penetration
         if entity_a.movable and entity_b.movable:
@@ -338,42 +350,41 @@ class World(object):
             force_b = -force if entity_b.movable else None
         return [force_a, force_b]
 
-    # get collision forces for contact between an entity and a wall
+    # Calculate the force from a wall to an entity
     def get_wall_collision_force(self, entity, wall):
         if entity.ghost and not wall.hard:
-            return None  # ghost passes through soft walls
-        if wall.orient == 'H':
-            prll_dim = 0
-            perp_dim = 1
-        else:
-            prll_dim = 1
-            perp_dim = 0
-        ent_pos = entity.state.p_pos
-        if (ent_pos[prll_dim] < wall.endpoints[0] - entity.size or
-                ent_pos[prll_dim] > wall.endpoints[1] + entity.size):
-            return None  # entity is beyond endpoints of wall
-        elif (ent_pos[prll_dim] < wall.endpoints[0] or
-              ent_pos[prll_dim] > wall.endpoints[1]):
-            # part of entity is beyond wall
-            if ent_pos[prll_dim] < wall.endpoints[0]:
-                dist_past_end = ent_pos[prll_dim] - wall.endpoints[0]
-            else:
-                dist_past_end = ent_pos[prll_dim] - wall.endpoints[1]
-            theta = np.arcsin(dist_past_end / entity.size)
-            dist_min = np.cos(theta) * entity.size + 0.5 * wall.width
-        else:  # entire entity lies within bounds of wall
-            theta = 0
-            dist_past_end = 0
-            dist_min = entity.size + 0.5 * wall.width
+            return None
 
-        # only need to calculate distance in relevant dim
-        delta_pos = ent_pos[perp_dim] - wall.axis_pos
-        dist = np.abs(delta_pos)
-        # softmax penetration
+        ent_pos = entity.state.p_pos
+        wall_vec = wall.end - wall.start
+        wall_len = np.linalg.norm(wall_vec)
+        wall_dir = wall_vec / wall_len
+
+        # Vector from wall start to entity
+        to_entity = ent_pos - wall.start
+
+        # Projection of entity position onto wall
+        proj_length = np.dot(to_entity, wall_dir)
+        proj_point = wall.start + proj_length * wall_dir
+
+        # Clamp projection to wall segment
+        proj_length_clamped = np.clip(proj_length, 0, wall_len)
+        closest_point = wall.start + proj_length_clamped * wall_dir
+
+        # Distance from entity to wall
+        delta = ent_pos - closest_point
+        dist = np.linalg.norm(delta)
+
+        # Compute penetration
         k = self.contact_margin
+        dist_min = entity.size + 0.5 * wall.width
         penetration = np.logaddexp(0, -(dist - dist_min)/k)*k
-        force_mag = self.contact_force * delta_pos / dist * penetration
-        force = np.zeros(2)
-        force[perp_dim] = np.cos(theta) * force_mag
-        force[prll_dim] = np.sin(theta) * np.abs(force_mag)
+
+        if dist == 0:
+            force_dir = np.random.randn(2)
+            force_dir /= np.linalg.norm(force_dir)
+        else:
+            force_dir = delta / dist
+
+        force = self.contact_force * force_dir * penetration
         return force

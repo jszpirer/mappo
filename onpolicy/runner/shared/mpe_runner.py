@@ -15,7 +15,6 @@ class MPERunner(Runner):
  
     def run(self):
         if int(self.curriculum_start) == 0:
-            print("Warmup")
             self.warmup()   
  
         start = time.time()
@@ -67,7 +66,6 @@ class MPERunner(Runner):
  
             # log information
             if episode % self.log_interval == 0:
-                print(self.trainer.value_normalizer.running_mean)
                 end = time.time()
                 print("\n Scenario {} Algo {} Exp {} updates {}/{} episodes, total num timesteps {}/{}, FPS {}.\n"
                         .format(self.all_args.scenario_name,
@@ -101,29 +99,44 @@ class MPERunner(Runner):
     def warmup(self):
         # reset env
         list_obs = []
+        list_critic_obs = []
         for it in range(self.batch_size // self.n_rollout_threads):
-            obs = self.envs.reset()
+            obs = self.envs.reset()    
+            if self.omniscient_critic:
+                critic_obs = [sublist[0] for sublist in obs]
+                list_critic_obs.append(critic_obs)
+                obs = [sublist[1:] for sublist in obs]
             list_obs.append(obs)
-        obs = np.concatenate(list_obs, axis=0)
+        obs = np.stack([np.stack(sublist, axis=0) for sublist in list_obs[0]], axis=0)
+        if self.omniscient_critic:
+            critic_obs = np.concatenate(list_critic_obs, axis=0)
  
         # replay buffer
         if self.use_centralized_V:
-            if len(obs[0][0].shape) == 2:
-                share_obs = obs.reshape(self.batch_size, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
+            if self.omniscient_critic:
+                share_obs = critic_obs
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
             else:
-                share_obs = obs.reshape(self.batch_size, -1)
+                share_obs = obs.reshape(self.n_rollout_threads, -1)
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
         else:
             share_obs = obs
- 
+
         self.buffer.share_obs[0] = share_obs.copy()
         self.buffer.obs[0] = obs.copy()
  
     @torch.no_grad()
     def collect(self, step, it):
         self.trainer.prep_rollout()
-        value, action, action_log_prob, rnn_states, rnn_states_critic \
+        if self.omniscient_critic:
+            value, action, action_log_prob, rnn_states, rnn_states_critic \
+            = self.trainer.policy.get_actions(self.buffer.share_obs[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads][:, 0, :],
+                            np.concatenate(self.buffer.obs[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
+                            np.concatenate(self.buffer.rnn_states[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
+                            self.buffer.rnn_states_critic[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads][:, 0, :],
+                            np.concatenate(self.buffer.masks[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]))
+        else:
+            value, action, action_log_prob, rnn_states, rnn_states_critic \
             = self.trainer.policy.get_actions(np.concatenate(self.buffer.share_obs[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
                             np.concatenate(self.buffer.obs[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
                             np.concatenate(self.buffer.rnn_states[step, it*self.n_rollout_threads:(it+1)*self.n_rollout_threads]),
@@ -143,28 +156,32 @@ class MPERunner(Runner):
                     actions_env = uc_actions_env
                 else:
                     actions_env = np.concatenate((actions_env, uc_actions_env), axis=2)
-        elif self.envs.action_space[0].__class__.__name__ == 'Discrete':
+        elif self.envs.action_space[0].__class__.__name__ == 'Discrete' :
             actions_env = np.squeeze(np.eye(self.envs.action_space[0].n)[actions], 2)
+        elif self.envs.action_space[0].__class__.__name__ == 'Box' :
+            actions_env = actions
         else:
             raise NotImplementedError
- 
         return values, actions, action_log_probs, rnn_states, rnn_states_critic, actions_env
  
     def insert(self, data, it):
         obs, rewards, dones, infos, values, actions, action_log_probs, rnn_states, rnn_states_critic = data
  
         rnn_states[dones == True] = np.zeros(((dones == True).sum(), self.recurrent_N, self.hidden_size), dtype=np.float32)
+        if self.omniscient_critic:
+            rnn_states_critic = rnn_states_critic.repeat(self.num_agents, axis=1)
         rnn_states_critic[dones == True] = np.zeros(((dones == True).sum(), *self.buffer.rnn_states_critic.shape[3:]), dtype=np.float32)
         masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
         masks[dones == True] = np.zeros(((dones == True).sum(), 1), dtype=np.float32)
  
         # replay buffer
         if self.use_centralized_V:
-            if len(obs[0][0].shape) == 2:
-                if self.world.omniscient_critic:
-                    share_obs = 
-                share_obs = obs.reshape(self.n_rollout_threads, len(obs[0]) * len(obs[0][0]), len(obs[0][0][0]))
+            if self.omniscient_critic:
+                share_obs = obs[:, 0].reshape(-1,1)
+                share_obs = np.stack([np.stack(sublist, axis=0) for sublist in share_obs], axis=0).squeeze(1)
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
+                obs = obs[:, 1:]
+                obs = np.stack([np.stack(sublist, axis=0) for sublist in obs], axis=0)
             else:
                 share_obs = obs.reshape(self.n_rollout_threads, -1)
                 share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)

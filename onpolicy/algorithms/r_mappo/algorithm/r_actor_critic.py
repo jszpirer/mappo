@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from math import ceil
 import gc
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
@@ -49,7 +50,6 @@ class R_Actor(nn.Module):
         self.base = base(args, obs_shape)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
-            print("using recurrence")
             self.rnn = RNNLayer(self.hidden_size, self.hidden_size, self._recurrent_N, self._use_orthogonal)
 
         self.act = ACTLayer(action_space, self.hidden_size, self._use_orthogonal, self._gain, args)
@@ -72,8 +72,14 @@ class R_Actor(nn.Module):
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
         list_obs = []
+        multi_channels = False
         for i in range(len(obs[0])):
-            obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
+            if  len(obs[0][i].shape) == 1 and i != 0:
+                multi_channels = True
+                indice_grid = int(obs[0][i][0])
+                obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
+            else:
+                obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
             list_obs.append(obs_to_add)
         rnn_states = check(rnn_states, self.grid_size, self.device)
         masks = check(masks, self.grid_size, self.device)
@@ -88,7 +94,6 @@ class R_Actor(nn.Module):
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
 
         actions, action_log_probs = self.act(actor_features, available_actions, deterministic)
-
         return actions, action_log_probs, rnn_states
 
     def evaluate_actions(self, obs, rnn_states, action, masks, available_actions=None, active_masks=None):
@@ -107,7 +112,11 @@ class R_Actor(nn.Module):
         """
         list_obs = []
         for i in range(len(obs[0])):
-            obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
+            if  len(obs[0][i].shape) == 1:
+                indice_grid = int(obs[0][i][0])
+                obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
+            else:
+                obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
             list_obs.append(obs_to_add)
         rnn_states = check(rnn_states, self.grid_size, self.device)
         action = check(action, self.grid_size, self.device)
@@ -153,7 +162,7 @@ class R_Critic(nn.Module):
         super(R_Critic, self).__init__()
         self.hidden_size = args.hidden_size
 
-        self.grid_size = args.grid_resolution
+        self.grid_size_critic = args.grid_resolution_critic
         
         self._use_orthogonal = args.use_orthogonal
         self._use_naive_recurrent_policy = args.use_naive_recurrent_policy
@@ -163,10 +172,11 @@ class R_Critic(nn.Module):
         self.tpdv = dict(dtype=torch.float32, device=device)
         self.device = device
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][self._use_orthogonal]
+        self.omniscient_critic = args.omniscient_critic
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
         base = MergedModel
-        self.base = base(args, cent_obs_shape)
+        self.base = base(args, cent_obs_shape, True)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             self.rnn = RNNLayer(self.hidden_size, self.hidden_size, self._recurrent_N, self._use_orthogonal)
@@ -193,16 +203,26 @@ class R_Critic(nn.Module):
         """
         list_cent_obs = []
         for i in range(len(cent_obs[0])):
-            cent_obs_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size,self. device)
+            if self.omniscient_critic and len(cent_obs[0][i].shape) == 1:
+                # In this case the observation is values for a grid, to know which one: check the first element of the observation
+                indice_grid = int(cent_obs[0][i][0])
+                cent_obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
+            else:
+                cent_obs_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device)
             list_cent_obs.append(cent_obs_to_add)
-        rnn_states = check(rnn_states, self.grid_size, self.device)
-        masks = check(masks, self.grid_size, self.device)
+        rnn_states = check(rnn_states, -1, self.device)
+        if self.omniscient_critic:
+            masks = check(masks[:rnn_states.size()[0]], -1, self.device)
+        else:
+            masks = check(masks, -1, self.device)
 
         critic_features = self.base(list_cent_obs)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             rnn_states = rnn_states
             masks = masks
+            if critic_features.size(0) != rnn_states.size(0) and self.omniscient_critic:
+                masks = masks.repeat(10, 1)
             critic_features, rnn_states = self.rnn(critic_features, rnn_states, masks)
         values = self.v_out(critic_features)
 
