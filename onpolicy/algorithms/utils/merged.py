@@ -9,17 +9,17 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 class SimplSparseSpreadCNN(nn.Module):
-    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1):
+    def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, padding_size=0):
         super(SimplSparseSpreadCNN, self).__init__()
 
         # Create separate convolutional layers for each channel
         self.net = spconv.SparseSequential(
-            spconv.SparseConv2d(in_channels=input_channels, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False),
+            spconv.SparseConv2d(in_channels=input_channels, out_channels=output_channels, kernel_size=kernel_size, stride=stride, bias=False, padding=padding_size),
             nn.Tanh()
         )
         self.tanh = nn.Tanh()
         input_width = obs_shape[0]
-        self.size = ((input_width - kernel_size) // stride + 1)
+        self.size = ((input_width - kernel_size + 2*padding_size) // stride + 1)
         self.fc = nn.Linear(in_features=self.size * self.size, out_features=output_size)
 
     def forward(self, list_x):
@@ -82,6 +82,7 @@ class MergedModel(nn.Module):
        self.omniscient_critic = mlp_args.omniscient_critic
        self.dim_actor = mlp_args.dim_actor
        self.critic = critic
+       padding_actor=mlp_args.padding
        if self.critic and self.omniscient_critic:
            self.dim_actor = 3
 
@@ -95,7 +96,7 @@ class MergedModel(nn.Module):
             input_size = flattened_size
        else:
             if "rvr" in self.experiment_name:
-                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
+                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3, padding_size=padding_actor)
             else:
                 self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
               

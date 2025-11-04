@@ -221,6 +221,8 @@ def get_config():
                         help="Whether to use Orthogonal initialization for weights and 0 initialization for biases")
     parser.add_argument("--gain", type=float, default=0.01,
                         help="The gain # of last action layer")
+    parser.add_argument("--padding", type=int, default=0,
+                        help="Padding added to the actor grid for the convolution")
 
     # recurrent parameters
     parser.add_argument("--use_naive_recurrent_policy", action='store_true',
