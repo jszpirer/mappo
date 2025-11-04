@@ -1,16 +1,17 @@
 #!/bin/sh
 env="MPE"
-scenario="rvr_dispersion_local_omni_walls" 
+scenario="rvr_dispersion_local_omni_walls_smallgrid" 
 num_landmarks=0
 num_agents=5
-grid_resolution=81
+grid_resolution=75
 grid_resolution_critic=81
 nb_additional_data=2
 noise=0
 stride=2
 kernel=9
+padding=1
 algo="rmappo" #"mappo" "ippo"
-exp="rvr_local_omni"
+exp="rvr_local_omni_smallgrid_padding"
 seed_max=10
 project="rvr_dispersion_walls"
 
@@ -24,5 +25,5 @@ do
     --n_training_threads 1 --n_rollout_threads 128 --num_mini_batch 1 --episode_length 125 --num_env_steps 100000000 \
     --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
     --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --wheel_noise ${noise} \
-    --stride ${stride} --kernel ${kernel} --save_interval 1000000 --grid_resolution_critic ${grid_resolution_critic} --omniscient_critic --use_directions --dim_actor 4
+    --stride ${stride} --kernel ${kernel} --save_interval 1000000 --grid_resolution_critic ${grid_resolution_critic} --omniscient_critic --use_directions --dim_actor 4 --padding ${padding}
 done
