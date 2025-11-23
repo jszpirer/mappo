@@ -12,6 +12,7 @@ class Scenario(BaseScenario):
         world.dim_c = 2
         world.limit = 4.33
         world.num_agents = args.num_agents
+        world.num_landmarks = 3
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.grid_resolution_critic = args.grid_resolution_critic
@@ -33,6 +34,12 @@ class Scenario(BaseScenario):
             if world.use_directions:
                 agent.direction = np.random.uniform(0, 2 * np.pi, 1)
                 agent.direction = np.mod(agent.direction, 2 * np.pi)
+        # add landmarks
+        world.landmarks = [Landmark() for i in range(world.num_landmarks)]
+        for i, landmark in enumerate(world.landmarks):
+            landmark.name = 'landmark %d' % i
+            landmark.collide = False
+            landmark.movable = False
         # Walls
         side_length = 2.2414
         self.num_points = int(side_length/((4 * world.limit)/world.grid_resolution)) + 1
@@ -138,15 +145,13 @@ class Scenario(BaseScenario):
         camera_coords = [1]
         lidar_coords = [1]
         num_points = self.num_points * 12
-        all_pos = np.zeros((2, world.num_agents + num_points))
-
-        i = 0
-        j = 0
+        all_pos_x = []
+        all_pos_y = []        
+        
         for other in world.agents:
             camera = False
             lidar = False
             if other is agent:
-                j += 1
                 continue
 
             rel_pos = other.state.p_pos - agent_pos
@@ -166,7 +171,6 @@ class Scenario(BaseScenario):
                         break
 
             if occluded:
-                j += 1
                 continue
 
             grid_x = int(round(coef * rel_pos[0]) + scale)
@@ -179,8 +183,8 @@ class Scenario(BaseScenario):
                 camera = True
 
             if camera or lidar:
-                all_pos[0][i] = grid_x
-                all_pos[1][i] = grid_y
+                all_pos_x.append(grid_x)
+                all_pos_y.append(grid_y)
                 if camera:
                     camera_coords.append(1)
                 else:
@@ -189,9 +193,6 @@ class Scenario(BaseScenario):
                     lidar_coords.append(1)
                 else:
                     lidar_coords.append(0)
-                i+= 1
-            else:
-                j += 1
 
         for wall in world.walls:
             wall_points = self.discretize_wall(wall, 1 / coef)  # résolution adaptée à l'échelle
@@ -199,7 +200,6 @@ class Scenario(BaseScenario):
                 rel_pos = point - agent_pos
                 dist = np.linalg.norm(rel_pos)
                 if not (lidar_min <= dist <= 7.86):
-                    j += 1
                     continue
 
                 # Vérification d'occlusion par les agents
@@ -214,41 +214,73 @@ class Scenario(BaseScenario):
                             break
 
                 if occluded:
-                    j += 1
                     continue
 
                 grid_x = int(round(coef * rel_pos[0]) + scale)
                 grid_y = int(round(coef * rel_pos[1]) + scale)
 
-                all_pos[0][i] = grid_x
-                all_pos[1][i] = grid_y
-                i += 1
+                all_pos_x.append(grid_x)
+                all_pos_y.append(grid_y)
                 camera_coords.append(0)
                 lidar_coords.append(1)
-                
-        if j > 0:
-            all_pos = all_pos[:, :-j]
-
         
- 
+        all_pos_lists = [all_pos_x, all_pos_y]
+        all_pos = np.array(all_pos_lists)
         camera_array = np.array(camera_coords, dtype=int)
         lidar_array = np.array(lidar_coords, dtype=int)
 
 
-        landmarks_array = []
-        # Array for the landmarks (for now I only have one channel for now)
-        for patch in world.landmarks:
-            distance = entity.state.p_pos - agent.state.p_pos
+        landmarks_x = []
+        landmarks_y = []
+
+        for landmark in world.landmarks:
+            rel_pos = landmark.state.p_pos - agent_pos
+            dist = np.linalg.norm(rel_pos)
+            rel_dir = rel_pos / (dist + 1e-6)
+            angle_to_landmark = np.arccos(np.clip(np.dot(agent_dir, rel_dir), -1, 1))
+
+            # Vérification d'occlusion par les agents
+            occluded = False
+            for blocker in world.agents:
+                if blocker is agent:
+                    continue
+                blocker_vec = blocker.state.p_pos - agent_pos
+                if np.linalg.norm(blocker_vec) < dist and np.dot(blocker_vec, rel_pos) > 0:
+                    if np.linalg.norm(np.cross(rel_pos, blocker_vec)) / dist < blocker.size:
+                        occluded = True
+                        break
+
+            if occluded:
+                continue
+
+            # Si visible par la caméra
+            if cam_min <= dist <= cam_max and angle_to_landmark <= cam_fov / 2:
+                # Discrétisation dans la grille
+                grid_x = int(round(coef * rel_pos[0]) + scale)
+                grid_y = int(round(coef * rel_pos[1]) + scale)
+
+                # Marquer la zone du landmark (cercle)
+                radius_cells = int(round(landmark.state.size * coef))
+                for dx in range(-radius_cells, radius_cells + 1):
+                    for dy in range(-radius_cells, radius_cells + 1):
+                        if dx**2 + dy**2 <= radius_cells**2:
+                            gx, gy = grid_x + dx, grid_y + dy
+                            if 0 <= gx < grid_res and 0 <= gy < grid_res:
+                                landmarks_x.append(gx)
+                                landmarks_y.append(gy)
+
+            # Si le robot est dessus (capteur sol)
+            if dist <= landmark.state.size:
+                grid_x = int(round(coef * rel_pos[0]) + scale)
+                grid_y = int(round(coef * rel_pos[1]) + scale)
+                landmarks_x.append(grid_x)
+                landmarks_y.append(grid_y)
         
-        for i, entity in enumerate(world.landmarks):  # world.entities:
-            distance = entity.state.p_pos - agent.state.p_pos
-            coef = world.grid_resolution/(world.limit*4)
-            scale = (world.grid_resolution//2) - 1
-            entity_pos[0][i] = round(coef*distance[0]) + scale
-            entity_pos[1][i] = round(coef*distance[1]) + scale
+        landmarks = [landmarks_x, landmarks_y]
+        landmarks_array = np.array(landmarks)
         
-        observations = np.empty([4], dtype=object)
-        observations[:] = [agent.state.p_vel, all_pos, camera_array, lidar_array]
+        observations = np.empty([5], dtype=object)
+        observations[:] = [agent.state.p_vel, all_pos, camera_array, lidar_array,  landmarks_array]
         return observations
     
     
@@ -260,6 +292,8 @@ class Scenario(BaseScenario):
         agents_vel_y = np.zeros((world.num_agents + 1))
         agents_vel_y[0] = 2
         other_pos = np.zeros((2, world.num_agents))
+        landmarks_x = []
+        landmarks_y = []
         i = 0
         for other in world.agents:
             agents_vel_x[i + 1] = other.state.p_vel[0]
@@ -270,8 +304,25 @@ class Scenario(BaseScenario):
             other_pos[0][i] = round(coef*distance[0]) + scale
             other_pos[1][i] = round(coef*distance[1]) + scale
             i += 1
-        observations = np.empty([3], dtype=object)
-        observations[:] = [agents_vel_x, agents_vel_y, other_pos]
+        for patch in world.landmarks:
+            pos = patch.state.p_pos
+            grid_x = int(round(coef * pos[0]) + scale)
+            grid_y = int(round(coef * pos[1]) + scale)
+
+            # Marquer la zone du landmark (cercle)
+            radius_cells = int(round(patch.state.size * coef))
+            for dx in range(-radius_cells, radius_cells + 1):
+                for dy in range(-radius_cells, radius_cells + 1):
+                    if dx**2 + dy**2 <= radius_cells**2:
+                        gx, gy = grid_x + dx, grid_y + dy
+                        if 0 <= gx < world.grid_resolution and 0 <= gy < world.grid_resolution:
+                            landmarks_x.append(gx)
+                            landmarks_y.append(gy)
+        landmarks = [landmarks_x, landmarks_y]
+        landmarks_array = np.array(landmarks)
+        
+        observations = np.empty([4], dtype=object)
+        observations[:] = [agents_vel_x, agents_vel_y, other_pos, landmarks_array]
         return observations
     
     
