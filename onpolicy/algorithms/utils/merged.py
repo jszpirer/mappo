@@ -1,6 +1,6 @@
 import torch.nn as nn
 import spconv.pytorch as spconv
-from torch import cat, chunk, inf, sparse_coo_tensor, float32
+from torch import cat, chunk, inf, sparse_coo_tensor, float32, empty, device, zeros
 from .util import init
 from math import ceil
 
@@ -20,10 +20,12 @@ class SimplSparseSpreadCNN(nn.Module):
         self.tanh = nn.Tanh()
         input_width = obs_shape[0]
         self.size = ((input_width - kernel_size + 2*padding_size) // stride + 1)
+        self.output_size = output_size
         self.fc = nn.Linear(in_features=self.size * self.size, out_features=output_size)
 
     def forward(self, list_x):
         channels_values = []
+        
         for x in list_x:
             sparse = x.coalesce()
             values = sparse.values().view(-1, 1).to(float32)
@@ -34,20 +36,29 @@ class SimplSparseSpreadCNN(nn.Module):
         sparse = spconv.SparseConvTensor(values, indices, x.size()[1:], batch_size = x.size()[0])
 
         # Apply convolutional layers to each sparse tensor
-        output = self.net(sparse)
+        if sparse.features.size()[0] < 1:
+            device_for_tensor = device("cuda:0")
+            #i = empty((2, 0), device=device_for_tensor)
+            #v = empty((0,), device=device_for_tensor)
+            #flat = sparse_coo_tensor(i, v, size=(x.size()[0], self.size*self.size), device=device_for_tensor)
+            x = zeros((x.size()[0], self.output_size), device=device_for_tensor)
+            #print("No landmark")
+        else:
+            output = self.net(sparse)
 
-        coords = output.indices
-        new_coords = coords[:, :2].clone()
-        new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
-        output.indices = new_coords
+            coords = output.indices
+            new_coords = coords[:, :2].clone()
+            new_coords[:,1] = coords[:, 1] * self.size + coords[:, 2]
+            output.indices = new_coords
 
-        # Flatten the outputs
-        flat_indices = output.indices.permute(1, 0).contiguous().int()
-        flat_values = output.features.view(output.features.shape[0])
-        flat = sparse_coo_tensor(flat_indices, flat_values, size=(x.size()[0], self.size*self.size))
+            # Flatten the outputs
+            flat_indices = output.indices.permute(1, 0).contiguous().int()
+            flat_values = output.features.view(output.features.shape[0])
+            flat = sparse_coo_tensor(flat_indices, flat_values, size=(x.size()[0], self.size*self.size))
 
-        # Pass the flattened outputs through the linear layers
-        x = self.fc(flat)
+            # Pass the flattened outputs through the linear layers
+            x = self.fc(flat)
+            #print("Something detected")
 
         return self.tanh(x)
 
@@ -86,17 +97,24 @@ class MergedModel(nn.Module):
        if self.critic and self.omniscient_critic:
            self.dim_actor = 3
 
-       flattened_size = mlp_args.num_agents*2
+       if mlp_args.num_landmarks == 0:
+           num_landmarks_features = 6
+       else:
+           num_landmarks_features = mlp_args.num_landmarks*2
+       flattened_size = mlp_args.num_agents*2 + num_landmarks_features
        input_size = flattened_size + mlp_args.nb_additional_data*2
        if "local" in self.experiment_name:
             input_size = flattened_size + mlp_args.nb_additional_data
 
        if self.omniscient_critic and self.critic:
-            self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
-            input_size = flattened_size
+            self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), mlp_args.num_agents*2, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
+            #self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 0, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
+            input_size = flattened_size - num_landmarks_features
        else:
             if "rvr" in self.experiment_name:
-                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3, padding_size=padding_actor)
+                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3, padding_size=padding_actor)
+                #self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 0, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
+                input_size = 14
             else:
                 self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
               
@@ -106,6 +124,8 @@ class MergedModel(nn.Module):
             input_size *= mlp_args.num_agents
 
        if self._use_feature_normalization:
+            print("Size for norm")
+            print(input_size)
             self.feature_norm = nn.LayerNorm(input_size)
 
        self.mlp = MLPLayer(input_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
@@ -116,16 +136,21 @@ class MergedModel(nn.Module):
         for i in range(len(x)//(self.dim_actor)):
             if "local" in self.experiment_name:
                 if self.critic and self.omniscient_critic:
-                    x_inter = self.cnn1(x)
+                    x1 = self.cnn1(x[:3])
+                    #x2 = self.cnn2([x[3]])
+                    #x_inter = cat((x1, x2), dim=1)
+                    x_inter = x1
                 else:
                     velocity = x[i*self.dim_actor + 0]
 
                     if "rvr" in self.experiment_name:
-                        x1 = self.cnn1(x[1:])
+                        x1 = self.cnn1(x[1:4])
+                        #x2 = self.cnn2([x[4]])
+                        #x_inter = cat((velocity, x1, x2), dim=1)
+                        x_inter = cat((velocity, x1), dim=1)
                     else:
                         x1 = self.cnn1([x[i*self.dim_actor + 1]])
-
-                    x_inter = cat((velocity, x1), dim=1)
+                        x_inter = cat((velocity, x1), dim=1)
             else:
                 velocity = x[i*self.dim_actor + 0]
 

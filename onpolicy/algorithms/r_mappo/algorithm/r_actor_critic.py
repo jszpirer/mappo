@@ -74,8 +74,7 @@ class R_Actor(nn.Module):
         list_obs = []
         multi_channels = False
         for i in range(len(obs[0])):
-            if  len(obs[0][i].shape) == 1 and i != 0:
-                multi_channels = True
+            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4:
                 indice_grid = int(obs[0][i][0])
                 obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
@@ -112,7 +111,7 @@ class R_Actor(nn.Module):
         """
         list_obs = []
         for i in range(len(obs[0])):
-            if  len(obs[0][i].shape) == 1:
+            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4:
                 indice_grid = int(obs[0][i][0])
                 obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
@@ -203,7 +202,7 @@ class R_Critic(nn.Module):
         """
         list_cent_obs = []
         for i in range(len(cent_obs[0])):
-            if self.omniscient_critic and len(cent_obs[0][i].shape) == 1:
+            if self.omniscient_critic and len(cent_obs[0][i].shape) == 1 and i != 3:
                 # In this case the observation is values for a grid, to know which one: check the first element of the observation
                 indice_grid = int(cent_obs[0][i][0])
                 cent_obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
