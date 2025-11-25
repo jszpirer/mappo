@@ -261,8 +261,8 @@ class Scenario(BaseScenario):
         landmarks = [landmarks_x, landmarks_y]
         landmarks_array = np.array(landmarks)
         
-        observations = np.empty([4], dtype=object)
-        observations[:] = [agent.state.p_vel, all_pos, camera_array, lidar_array]
+        observations = np.empty([5], dtype=object)
+        observations[:] = [agent.state.p_vel, all_pos, camera_array, lidar_array, landmarks_array]
         return observations
     
     
@@ -303,8 +303,8 @@ class Scenario(BaseScenario):
         landmarks = [landmarks_x, landmarks_y]
         landmarks_array = np.array(landmarks)
         
-        observations = np.empty([3], dtype=object)
-        observations[:] = [agents_vel_x, agents_vel_y, other_pos]
+        observations = np.empty([4], dtype=object)
+        observations[:] = [agents_vel_x, agents_vel_y, other_pos, landmarks_array]
         return observations
     
     
