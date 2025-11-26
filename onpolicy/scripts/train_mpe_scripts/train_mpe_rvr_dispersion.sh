@@ -11,7 +11,7 @@ stride=2
 kernel=9
 padding=0
 algo="rmappo" #"mappo" "ippo"
-exp="rvr_local_omni_124actor3criticoutput"
+exp="rvr_local_omni_125actor3criti"
 seed_max=10
 project="rvr_dispersion_walls"
 

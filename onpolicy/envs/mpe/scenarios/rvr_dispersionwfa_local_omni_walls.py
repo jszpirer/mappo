@@ -40,6 +40,7 @@ class Scenario(BaseScenario):
             landmark.name = 'landmark %d' % i
             landmark.collide = False
             landmark.movable = False
+            landmark.size = 0.6
         # Walls
         side_length = 2.2414
         self.num_points = int(side_length/((4 * world.limit)/world.grid_resolution)) + 1
@@ -77,6 +78,13 @@ class Scenario(BaseScenario):
             agent.state.p_pos = np.array([r * np.cos(theta), r * np.sin(theta)])
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
+
+        # set random initial positions for the landmarks
+        for landmark in world.landmarks:
+            r  = (4.0325 - 0.6) * np.sqrt(np.random.uniform(0, 1))
+            theta = np.random.uniform(0, 2 * np.pi)
+            landmark.state.p_pos = np.array([r * np.cos(theta), r * np.sin(theta)])
+            landmark.state.p_vel = np.zeros(world.dim_p)
 
     def benchmark_data(self, agent, world):
         rew = 0
