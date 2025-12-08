@@ -239,7 +239,7 @@ class FilledPolygon(Geom):
             glVertex3f(p[0], p[1],0)  # draw each vertex
         glEnd()
 
-def Arrow(Geom):
+class Arrow(Geom):
     def __init__(self, start=(0.0, 0.0), direction=0.0, length=1.0, head_length=0.1, head_width=0.05):
         Geom.__init__(self)
         self.start = start
@@ -254,7 +254,7 @@ def Arrow(Geom):
         # Convert angle to vector
         dx = np.sin(self.direction) * self.length
         dy = np.cos(self.direction) * self.length
-        end = self.start + np.array([dx, dy])
+        end = (self.start[0]+dx, self.start[1]+dy)
         
         # Draw the main line
         glBegin(GL_LINES)
@@ -263,7 +263,7 @@ def Arrow(Geom):
         glEnd()
 
         # Compute arrowhead
-        directionvec = end - self.start
+        directionvec = np.array([end[0] - self.start[0], end[1] - self.start[1]])
         norm = np.linalg.norm(directionvec)
         if norm == 0:
             return

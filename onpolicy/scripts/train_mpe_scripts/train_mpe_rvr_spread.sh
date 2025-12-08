@@ -1,8 +1,8 @@
 #!/bin/sh
 env="MPE"
-scenario="rvr_dispersion_local_omni_walls" 
-num_landmarks=0
-num_agents=10
+scenario="rvr_spread_local_omni_walls" 
+num_landmarks=5
+num_agents=5
 grid_resolution=81
 grid_resolution_critic=81
 nb_additional_data=2
@@ -11,13 +11,13 @@ stride=2
 kernel=9
 padding=0
 algo="rmappo" #"mappo" "ippo"
-exp="rvr_local_omni_12and5both"
+exp="rvr_local_omni_12and5both0.15"
 seed_max=10
-project="rvr_dispersion_walls_10agents"
+project="rvr_spread_walls"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in 2
+for seed in 1
 do
     echo "seed is ${seed}:"
     TORCH_USE_CUDA_DSA=1 CUDA_LAUNCH_BLOCKING=1 CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \

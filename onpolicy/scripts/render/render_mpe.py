@@ -38,6 +38,7 @@ def parse_args(args, parser):
     parser.add_argument('--num_agents', type=int,
                         default=2, help="number of players")
     parser.add_argument("--grid_resolution", type=int, default=0)
+    parser.add_argument("--grid_resolution_critic", type=int, default=0)
     parser.add_argument("--nb_additional_data", type=int, default=0)
     parser.add_argument("--wheel_noise", type=float, default=0)
     parser.add_argument("--range_noise", type=float, default=0)
@@ -46,8 +47,13 @@ def parse_args(args, parser):
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--kernel", type=int, default=2)
     parser.add_argument("--output_other", type=int, default=0)
+    parser.add_argument("--curriculum_start", type=int, default=0)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--output_entities", type=int, default=6)
-
+    parser.add_argument("--use_directions", action='store_true',
+                        default=False, help="Whether to use directions for the particles or not")
+    parser.add_argument("--discrete_action", action='store_false',
+                        default=True, help="Whether to use discrete actions or not")
     all_args = parser.parse_known_args(args)[0]
 
     return all_args

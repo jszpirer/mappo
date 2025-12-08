@@ -341,7 +341,6 @@ class MultiAgentEnv(gym.Env):
             # import rendering only if we need it (and don't import for headless machines)
             #from gym.envs.classic_control import rendering
             from . import rendering
-            from rendering import Arrow
             self.render_geoms = []
             self.render_geoms_xform = []
 
@@ -358,11 +357,11 @@ class MultiAgentEnv(gym.Env):
 
                     if self.world.use_directions:
                         direction = entity.direction
-                        arrow = Arrow(start=(entity.state.p_pos[0], entity.state.p_pos[1]),
-                                        direction=entity.direction,
-                                        length=entity.size * 1.5,
-                                        head_length=entity.size * 0.5,
-                                        head_width=entity.size * 0.3)
+                        arrow = rendering.Arrow((entity.state.p_pos[0], entity.state.p_pos[1]),
+                                        entity.direction,
+                                        entity.size * 1.5,
+                                        entity.size * 0.5,
+                                        entity.size * 0.3)
                         arrow.set_linewidth(0.5)
                         arrow.add_attr(xform)
                         self.render_geoms.append(arrow)                                     
@@ -400,15 +399,24 @@ class MultiAgentEnv(gym.Env):
                 self.render_geoms_xform.append(xform)
                 self.comm_geoms.append(entity_comm_geoms)
             for wall in self.world.walls:
-                corners = ((wall.axis_pos - 0.5 * wall.width, wall.endpoints[0]),
-                           (wall.axis_pos - 0.5 *
-                            wall.width, wall.endpoints[1]),
-                           (wall.axis_pos + 0.5 *
-                            wall.width, wall.endpoints[1]),
-                           (wall.axis_pos + 0.5 * wall.width, wall.endpoints[0]))
-                if wall.orient == 'H':
-                    corners = tuple(c[::-1] for c in corners)
+                p0 = np.asarray(wall.start, dtype=np.float32)
+                p1 = np.asarray(wall.end, dtype=np.float32)
+                w = float(wall.width)
+
+                v = p1 - p0
+                L = np.linalg.norm(v)
+
+                n = np.array([-v[1], v[0]], dtype=np.float32)/L
+                offset = (w/2.0) * n
+
+                c1 = p0 - offset
+                c2 = p0 + offset
+                c3 = p1 + offset
+                c4 = p1 - offset
+                
+                corners = [tuple(c1), tuple(c2), tuple(c3), tuple(c4)]
                 geom = rendering.make_polygon(corners)
+
                 if wall.hard:
                     geom.set_color(*wall.color)
                 else:
