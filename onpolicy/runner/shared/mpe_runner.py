@@ -241,7 +241,12 @@ class MPERunner(Runner):
         
         all_frames = []
         for episode in range(self.all_args.render_episodes):
+            list_obs = []
             obs = envs.reset()
+            if self.omniscient_critic:
+                obs = [sublist[1:] for sublist in obs]
+            list_obs.append(obs)
+            obs = np.stack([np.stack(sublist, axis=0) for sublist in list_obs[0]], axis=0)
             if self.all_args.save_gifs:
                 image = envs.render('rgb_array')[0][0]
                 all_frames.append(image)
@@ -280,6 +285,11 @@ class MPERunner(Runner):
  
                 # Obser reward and next obs
                 obs, rewards, dones, infos = envs.step(actions_env)
+                list_obs = []
+                if self.omniscient_critic:
+                    obs = [sublist[1:] for sublist in obs]
+                list_obs.append(obs)
+                obs = np.stack([np.stack(sublist, axis=0) for sublist in list_obs[0]], axis=0)
                 episode_rewards.append(rewards)
                 ############ Remove the comment if needed
                 score += rewards[0][0]
