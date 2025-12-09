@@ -345,7 +345,6 @@ class MultiAgentEnv(gym.Env):
             self.render_geoms_xform = []
 
             self.comm_geoms = []
-
             for entity in self.world.entities:
                 geom = rendering.make_circle(entity.size)
                 xform = rendering.Transform()
@@ -356,7 +355,6 @@ class MultiAgentEnv(gym.Env):
                     geom.set_color(*entity.color, alpha=0.5)
 
                     if self.world.use_directions:
-                        direction = entity.direction
                         arrow = rendering.Arrow((entity.state.p_pos[0], entity.state.p_pos[1]),
                                         entity.direction,
                                         entity.size * 1.5,
