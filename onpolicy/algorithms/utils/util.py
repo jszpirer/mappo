@@ -36,32 +36,25 @@ def check(input, grid_size, device, list_values=None):
     if len(input[0].shape) == 1:
         return torch.tensor(np.array(input, dtype=np.float32)).to(device)
 
-    #Étape 1 : calcul du nombre total d'éléments    
-    B = len(input)
-    lengths = np.empty(B, dtype=np.int64)
-    for i, (xs, ys) in enumerate(input):
-        xi = np.asarray(xs)
-        yi = np.asarray(ys)
-        if xi.shape[0] != yi.shape[0]:
-            raise ValueError(f"Batch {i}: x et y ont des longueurs différentes.")
-        lengths[i] = xi.shape[0]
-    total = int(lengths.sum())
-
+    #Étape 1 : calcul du nombre total d'éléments     
+    lengths = np.array([len(x[0]) for x in input], dtype=np.int64)
+    total = lengths.sum()
 
     #Étape 3 : remplissage en un seul passage
     batch_indices_np = np.repeat(np.arange(len(input), dtype=np.int32), lengths)
     x_indices_np = np.concatenate([x[0] for x in input])
     y_indices_np = np.concatenate([x[1] for x in input])
     
-    #Création des indices et valeurs
-    batch_indices = torch.from_numpy(batch_indices_np).to(device)
-    x_indices = torch.from_numpy(x_indices_np).to(device)
-    y_indices = torch.from_numpy(y_indices_np).to(device)
+    #Création des indices et valeurs    
+    batch_indices = torch.as_tensor(batch_indices_np, dtype=torch.int64, device=device)
+    x_indices = torch.as_tensor(x_indices_np, dtype=torch.int64, device=device)
+    y_indices = torch.as_tensor(y_indices_np, dtype=torch.int64, device=device)
     if list_values is None:
         values = torch.ones(total, dtype=torch.float32, device=device)
-    else:
-        values = torch.from_numpy(np.concatenate(list_values)).to(device)
+    else:        
+        vals_np = np.concatenate(list_values).astype(np.float32)
+        values = torch.as_tensor(vals_np, dtype=torch.float32, device=device)
     
     indices = torch.stack([batch_indices, x_indices, y_indices], dim=0)
     shape = (len(input), grid_size, grid_size)
-    return torch.sparse_coo_tensor(indices, values, shape, device=device)
+    return torch.sparse_coo_tensor(indices, values, shape, device=device).coalesce()
