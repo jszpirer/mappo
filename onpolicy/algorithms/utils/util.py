@@ -36,9 +36,17 @@ def check(input, grid_size, device, list_values=None):
     if len(input[0].shape) == 1:
         return torch.tensor(np.array(input, dtype=np.float32)).to(device)
 
-    #Étape 1 : calcul du nombre total d'éléments
-    lengths = np.array([len(x[0]) for x in input], dtype=np.int32)
-    total = lengths.sum()
+    #Étape 1 : calcul du nombre total d'éléments    
+    B = len(input)
+    lengths = np.empty(B, dtype=np.int64)
+    for i, (xs, ys) in enumerate(input):
+        xi = np.asarray(xs)
+        yi = np.asarray(ys)
+        if xi.shape[0] != yi.shape[0]:
+            raise ValueError(f"Batch {i}: x et y ont des longueurs différentes.")
+        lengths[i] = xi.shape[0]
+    total = int(lengths.sum())
+
 
     #Étape 3 : remplissage en un seul passage
     batch_indices_np = np.repeat(np.arange(len(input), dtype=np.int32), lengths)
