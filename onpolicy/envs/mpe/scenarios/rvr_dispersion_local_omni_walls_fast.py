@@ -116,6 +116,7 @@ class Scenario(BaseScenario):
         cam_fov = np.deg2rad(130)
         cam_min2, cam_max2 = 0.393 ** 2, 5.89 ** 2
         lidar_min2, lidar_max2 = 0.118 ** 2, 2.77 ** 2
+        cos_fov_half2 = np.cos(cam_fov/2) ** 2
 
         grid_res = world.grid_resolution
         scale = (grid_res // 2) - 1
@@ -142,7 +143,6 @@ class Scenario(BaseScenario):
             if lidar_min2 <= dist2 <= lidar_max2:
                 lidar = True
  
-            cos_fov_half2 = np.cos(cam_fov/2) ** 2
             dot_ar = agent_dir[0]*rel_pos[0] + agent_dir[1]*rel_pos[1]
             camera = (cam_min2 <= dist2 <= cam_max2) and (dot_ar >= 0) and ((dot_ar * dot_ar) >= dist2 * cos_fov_half2)
 
@@ -154,9 +154,9 @@ class Scenario(BaseScenario):
                     if blocker is agent or blocker is other:
                         continue
                     blocker_vec = blocker.state.p_pos - agent_pos
-                    b_dist2 = blocker.state.p_pos[0]*blocker.state.p_pos[0] + blocker.state.p_pos[1]*blocker.state.p_pos[1]
+                    b_dist2 = blocker_vec[0]*blocker_vec[0] + blocker_vec[1]*blocker_vec[1]
                     if b_dist2 < dist2 and np.dot(blocker_vec, rel_pos) > 0:
-                        cross = rel_pos[0]*blocker_vec[1] + rel_pos[1] * blocker_vec[0]
+                        cross = rel_pos[0]*blocker_vec[1] - rel_pos[1] * blocker_vec[0]
                         if (cross * cross) < (blocker.size * blocker.size) * dist2:
                             occluded = True
                             break
@@ -196,7 +196,7 @@ class Scenario(BaseScenario):
                     blocker_vec = blocker.state.p_pos - agent_pos
                     b_dist2 = blocker_vec[0]*blocker_vec[0] + blocker_vec[1]*blocker_vec[1]
                     if b_dist2 < dist2 and np.dot(blocker_vec, rel_pos) > 0:
-                        cross = rel_pos[0]*blocker_vec[1] + rel_pos[1]*blocker_vec[0]
+                        cross = rel_pos[0]*blocker_vec[1] - rel_pos[1]*blocker_vec[0]
                         if (cross * cross) < (blocker.size * blocker.size) * dist2:
                             occluded = True
                             break
