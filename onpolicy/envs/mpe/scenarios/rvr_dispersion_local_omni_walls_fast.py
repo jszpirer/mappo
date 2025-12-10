@@ -112,71 +112,70 @@ class Scenario(BaseScenario):
         points = [start + (end - start) * i / num_points for i in range(num_points + 1)]
         return points
 
-    
-import numpy as np
 
-def _prepare_blockers(self, agent, world, max_target_dist2):
-    blockers_pos = []
-    blockers_size = []
-    blockers_objs = []
-    for b in world.agents:
-        if b is agent:
-            continue
-        blockers_pos.append(b.state.p_pos)
-        blockers_size.append(b.size)
-        blockers_objs.append(b)
+    def _prepare_blockers(self, agent, world, max_target_dist2):
+        blockers_pos = []
+        blockers_size = []
+        blockers_objs = []
+        for b in world.agents:
+            if b is agent:
+                continue
+            blockers_pos.append(b.state.p_pos)
+            blockers_size.append(b.size)
+            blockers_objs.append(b)
 
-    if len(blockers_pos) == 0:
-        bvec = np.empty((0, 2), dtype=np.float64)
-        bdist2 = np.empty((0,), dtype=np.float64)
-        bsize = np.empty((0,), dtype=np.float64)
-        blocker_index_map = {}
+        if len(blockers_pos) == 0:
+            bvec = np.empty((0, 2), dtype=np.float64)
+            bdist2 = np.empty((0,), dtype=np.float64)
+            bsize = np.empty((0,), dtype=np.float64)
+            blocker_index_map = {}
+            return bvec, bdist2, bsize, blocker_index_map
+
+        bpos = np.asarray(blockers_pos, dtype=np.float64)
+        bsize = np.asarray(blockers_size, dtype=np.float64)
+
+        bvec_all = bpos - agent.state.p_pos
+        bdist2_all = np.einsum('ij,ij->i', bvec_all, bvec_all)
+
+        mask = (bdist2_all <= max_target_dist2)
+
+        bvec = bvec_all[mask]
+        bdist2 = bdist2_all[mask]
+        bsize = bsize[mask]
+
+        orig_indices = np.nonzero(mask)[0]
+        blocker_index_map = {id(blockers_objs[i]): j for j, i in enumerate(orig_indices)}
+
         return bvec, bdist2, bsize, blocker_index_map
 
-    bpos = np.asarray(blockers_pos, dtype=np.float64)
-    bsize = np.asarray(blockers_size, dtype=np.float64)
 
-    bvec_all = bpos - agent.state.p_pos
-    bdist2_all = np.einsum('ij,ij->i', bvec_all, bvec_all)
+    @staticmethod
+    def _is_occluded(rel_pos, bvec, bdist2, bsize, skip_index=None):
+        if bvec.shape[0] == 0:
+            return False
 
-    mask = (bdist2_all <= max_target_dist2)
+        ax, ay = float(rel_pos[0]), float(rel_pos[1])
+        dist2 = ax*ax + ay*ay
+        if dist2 == 0.0:
+            return False
 
-    bvec = bvec_all[mask]
-    bdist2 = bdist2_all[mask]
-    bsize = bsize[mask]
+        cross = ax * bvec[:, 1] - ay * bvec[:, 0]
+        near_line = (cross * cross) < (bsize * bsize) * dist2
+        closer = bdist2 < dist2
+        ahead = (bvec[:, 0] * ax + bvec[:, 1] * ay) > 0.0
 
-    orig_indices = np.nonzero(mask)[0]
-    blocker_index_map = {id(blockers_objs[i]): j for j, i in enumerate(orig_indices)}
+        mask = near_line & closer & ahead
+        if skip_index is not None and 0 <= skip_index < mask.size:
+            mask[skip_index] = False
 
-    return bvec, bdist2, bsize, blocker_index_map
-
-
-@staticmethod
-def _is_occluded(rel_pos, bvec, bdist2, bsize, skip_index=None):
-    if bvec.shape[0] == 0:
-        return False
-
-    ax, ay = float(rel_pos[0]), float(rel_pos[1])
-    dist2 = ax*ax + ay*ay
-    if dist2 == 0.0:
-        return False
-
-    cross = ax * bvec[:, 1] - ay * bvec[:, 0]
-    near_line = (cross * cross) < (bsize * bsize) * dist2
-    closer = bdist2 < dist2
-    ahead = (bvec[:, 0] * ax + bvec[:, 1] * ay) > 0.0
-
-    mask = near_line & closer & ahead
-    if skip_index is not None and 0 <= skip_index < mask.size:
-        mask[skip_index] = False
-
-    return bool(np.any(mask))
+        return bool(np.any(mask))
 
 
     def observation(self, agent, world):
         cam_fov = np.deg2rad(130)
         cam_min2, cam_max2 = 0.393 ** 2, 5.89 ** 2
         lidar_min2, lidar_max2 = 0.118 ** 2, 2.77 ** 2
+        walls_lidar_min2, walls_lidar_max2 = 0.118 ** 2, 7.86 ** 2
         cos_fov_half2 = np.cos(cam_fov/2) ** 2
 
         grid_res = world.grid_resolution
@@ -228,7 +227,7 @@ def _is_occluded(rel_pos, bvec, bdist2, bsize, skip_index=None):
             wid = id(wall)
             if wid not in self._wall_points_cache:
                 self._wall_points_cache[wid] = self.discretize_wall(wall, 1.0 / coef)
-                    wall_points = self._wall_points_cache[wid]
+            wall_points = self._wall_points_cache[wid]
             for point in wall_points:
                 rel_pos = point - agent_pos
                 dist2 = rel_pos[0]*rel_pos[0] + rel_pos[1]*rel_pos[1]
