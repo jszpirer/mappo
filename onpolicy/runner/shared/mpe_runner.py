@@ -106,8 +106,14 @@ class MPERunner(Runner):
                 critic_obs = [sublist[0] for sublist in obs]
                 list_critic_obs.append(critic_obs)
                 obs = [sublist[1:] for sublist in obs]
-            list_obs.append(obs)
-        obs = np.stack([np.stack(sublist, axis=0) for sublist in list_obs[0]], axis=0)
+            list_obs.append(obs)        
+        arr = np.stack(
+            [np.stack([np.stack(sublist, axis=0) for sublist in group], axis=0)
+             for group in list_obs],
+            axis=0
+        )
+        obs = arr.reshape(-1, *arr.shape[2:])
+        #obs = np.stack([np.stack(sublist, axis=0) for sublist in list_obs[0]], axis=0)
         if self.omniscient_critic:
             critic_obs = np.concatenate(list_critic_obs, axis=0)
  
