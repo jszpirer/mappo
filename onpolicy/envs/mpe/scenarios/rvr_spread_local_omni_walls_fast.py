@@ -126,10 +126,71 @@ class Scenario(BaseScenario):
         points = [start + (end - start) * i / num_points for i in range(num_points + 1)]
         return points
 
+
+    def _prepare_blockers(self, agent, world, max_target_dist2):
+        blockers_pos = []
+        blockers_size = []
+        blockers_objs = []
+        for b in world.agents:
+            if b is agent:
+                continue
+            blockers_pos.append(b.state.p_pos)
+            blockers_size.append(b.size)
+            blockers_objs.append(b)
+
+        if len(blockers_pos) == 0:
+            bvec = np.empty((0, 2), dtype=np.float64)
+            bdist2 = np.empty((0,), dtype=np.float64)
+            bsize = np.empty((0,), dtype=np.float64)
+            blocker_index_map = {}
+            return bvec, bdist2, bsize, blocker_index_map
+
+        bpos = np.asarray(blockers_pos, dtype=np.float64)
+        bsize = np.asarray(blockers_size, dtype=np.float64)
+
+        bvec_all = bpos - agent.state.p_pos
+        bdist2_all = np.einsum('ij,ij->i', bvec_all, bvec_all)
+
+        mask = (bdist2_all <= max_target_dist2)
+
+        bvec = bvec_all[mask]
+        bdist2 = bdist2_all[mask]
+        bsize = bsize[mask]
+
+        orig_indices = np.nonzero(mask)[0]
+        blocker_index_map = {id(blockers_objs[i]): j for j, i in enumerate(orig_indices)}
+
+        return bvec, bdist2, bsize, blocker_index_map
+
+
+    @staticmethod
+    def _is_occluded(rel_pos, bvec, bdist2, bsize, skip_index=None):
+        if bvec.shape[0] == 0:
+            return False
+
+        ax, ay = float(rel_pos[0]), float(rel_pos[1])
+        dist2 = ax*ax + ay*ay
+        if dist2 == 0.0:
+            return False
+
+        cross = ax * bvec[:, 1] - ay * bvec[:, 0]
+        near_line = (cross * cross) < (bsize * bsize) * dist2
+        closer = bdist2 < dist2
+        ahead = (bvec[:, 0] * ax + bvec[:, 1] * ay) > 0.0
+
+        mask = near_line & closer & ahead
+        if skip_index is not None and 0 <= skip_index < mask.size:
+            mask[skip_index] = False
+
+        return bool(np.any(mask))
+
+
     def observation(self, agent, world):
         cam_fov = np.deg2rad(130)
-        cam_min, cam_max = 0.393, 5.89
-        lidar_min, lidar_max = 0.118, 2.77
+        cam_min2, cam_max2 = 0.393 ** 2, 5.89 ** 2
+        lidar_min2, lidar_max2 = 0.118 ** 2, 2.77 ** 2
+        walls_lidar_min2, walls_lidar_max2 = 0.118 ** 2, 7.86 ** 2
+        cos_fov_half2 = np.cos(cam_fov/2) ** 2
 
         grid_res = world.grid_resolution
         scale = (grid_res // 2) - 1
@@ -144,136 +205,107 @@ class Scenario(BaseScenario):
         all_pos_x = []
         all_pos_y = []        
         
+        
+        max_target_dist2 = max(cam_max2, walls_lidar_max2)
+        bvec, bdist2, bsize, blocker_index_map = self._prepare_blockers(agent, world, max_target_dist2)
+        
         for other in world.agents:
-            camera = False
-            lidar = False
             if other is agent:
-                continue
-
+                continue        
             rel_pos = other.state.p_pos - agent_pos
-            dist = np.linalg.norm(rel_pos)
-            rel_dir = rel_pos / (dist + 1e-6)
-            angle_to_other = np.arccos(np.clip(np.dot(agent_dir, rel_dir), -1, 1))
-
-            # Verfification if the agent can see the other or not
-            occluded = False
-            for blocker in world.agents:
-                if blocker is agent or blocker is other:
-                    continue
-                blocker_vec = blocker.state.p_pos - agent_pos
-                if np.linalg.norm(blocker_vec) < dist and np.dot(blocker_vec, rel_pos) > 0:
-                    if np.linalg.norm(np.cross(rel_pos, blocker_vec)) / dist < blocker.size:
-                        occluded = True
-                        break
-
-            if occluded:
+            dist2 = rel_pos[0]*rel_pos[0] + rel_pos[1]*rel_pos[1]
+            if dist2 == 0.0:
+                continue
+            dot_ar = agent_dir[0]*rel_pos[0] + agent_dir[1]*rel_pos[1]
+            lidar = (lidar_min2 <= dist2 <= lidar_max2)            
+            camera = (cam_min2 <= dist2 <= cam_max2) and (dot_ar >= 0.0) and ((dot_ar*dot_ar) >= dist2 * cos_fov_half2)                
+            if not (camera or lidar):
                 continue
 
-            grid_x = int(round(coef * rel_pos[0]) + scale)
-            grid_y = int(round(coef * rel_pos[1]) + scale)
- 
-            if lidar_min <= dist <= lidar_max:
-                lidar = True
- 
-            if cam_min <= dist <= cam_max and angle_to_other <= cam_fov / 2:
-                camera = True
+            skip_idx = blocker_index_map.get(id(other), None)
+            if self._is_occluded(rel_pos, bvec, bdist2, bsize, skip_index=skip_idx):
+                continue
+                
+            grid_x = int(np.rint(coef * rel_pos[0]) + scale)
+            grid_y = int(np.rint(coef * rel_pos[1]) + scale)
 
-            if camera or lidar:
-                all_pos_x.append(grid_x)
-                all_pos_y.append(grid_y)
-                if camera:
-                    camera_coords.append(1)
-                else:
-                    camera_coords.append(0)
-                if lidar :
-                    lidar_coords.append(1)
-                else:
-                    lidar_coords.append(0)
-
+            all_pos_x.append(grid_x)
+            all_pos_y.append(grid_y)
+            camera_coords.append(1 if camera else 0)
+            lidar_coords.append(1 if lidar else 0)
+        
+        if not hasattr(self, "_wall_points_cache"):
+            self._wall_points_cache = {}
+        
         for wall in world.walls:
-            wall_points = self.discretize_wall(wall, 1 / coef)  # résolution adaptée à l'échelle
+            wid = id(wall)
+            if wid not in self._wall_points_cache:
+                self._wall_points_cache[wid] = self.discretize_wall(wall, 1.0 / coef)
+            wall_points = self._wall_points_cache[wid]
             for point in wall_points:
                 rel_pos = point - agent_pos
-                dist = np.linalg.norm(rel_pos)
-                if not (lidar_min <= dist <= 7.86):
+                dist2 = rel_pos[0]*rel_pos[0] + rel_pos[1]*rel_pos[1]
+                if not (lidar_min2 <= dist2 <= walls_lidar_max2):
+                    continue                
+                if self._is_occluded(rel_pos, bvec, bdist2, bsize):
                     continue
-
-                # Vérification d'occlusion par les agents
-                occluded = False
-                for blocker in world.agents:
-                    if blocker is agent:
-                        continue
-                    blocker_vec = blocker.state.p_pos - agent_pos
-                    if np.linalg.norm(blocker_vec) < dist and np.dot(blocker_vec, rel_pos) > 0:
-                        if np.linalg.norm(np.cross(rel_pos, blocker_vec)) / dist < blocker.size:
-                            occluded = True
-                            break
-
-                if occluded:
-                    continue
-
-                grid_x = int(round(coef * rel_pos[0]) + scale)
-                grid_y = int(round(coef * rel_pos[1]) + scale)
+                grid_x = int(np.rint(coef * rel_pos[0]) + scale)
+                grid_y = int(np.rint(coef * rel_pos[1]) + scale)
 
                 all_pos_x.append(grid_x)
                 all_pos_y.append(grid_y)
                 camera_coords.append(0)
                 lidar_coords.append(1)
         
-        all_pos_lists = [all_pos_x, all_pos_y]
-        all_pos = np.array(all_pos_lists)
-        camera_array = np.array(camera_coords, dtype=int)
-        lidar_array = np.array(lidar_coords, dtype=int)
-
+        all_pos = np.array([all_pos_x, all_pos_y], dtype=np.int32)
+        camera_array = np.asarray(camera_coords, dtype=np.int32)
+        lidar_array  = np.asarray(lidar_coords,  dtype=np.int32)
 
         landmarks_x = []
         landmarks_y = []
 
+        if not hasattr(self, "_disk_offsets_cache"):
+            self._disk_offsets_cache = {}
+            
         for landmark in world.landmarks:
             rel_pos = landmark.state.p_pos - agent_pos
-            dist = np.linalg.norm(rel_pos)
-            rel_dir = rel_pos / (dist + 1e-6)
-            angle_to_landmark = np.arccos(np.clip(np.dot(agent_dir, rel_dir), -1, 1))
+            dist2 = rel_pos[0]*rel_pos[0] + rel_pos[1]*rel_pos[1]
+            dot_ar = agent_dir[0]*rel_pos[0] + agent_dir[1]*rel_pos[1]
 
-            # Vérification d'occlusion par les agents
-            occluded = False
-            for blocker in world.agents:
-                if blocker is agent:
-                    continue
-                blocker_vec = blocker.state.p_pos - agent_pos
-                if np.linalg.norm(blocker_vec) < dist and np.dot(blocker_vec, rel_pos) > 0:
-                    if np.linalg.norm(np.cross(rel_pos, blocker_vec)) / dist < blocker.size:
-                        occluded = True
-                        break
+            camera = (cam_min2 <= dist2 <= cam_max2) and (dot_ar >= 0.0) and ((dot_ar * dot_ar) >= dist2 * cos_fov_half2)
 
-            if occluded:
+            if not camera:
+                continue            
+            if camera and self._is_occluded(rel_pos, bvec, bdist2, bsize):
                 continue
+            
+            grid_x = int(np.rint(coef * rel_pos[0]) + scale)
+            grid_y = int(np.rint(coef * rel_pos[1]) + scale)
+            
+            radius_cells = int(np.rint(landmark.state.size * coef))
+            if radius_cells <= 0:
+                if 0 <= grid_x < grid_res and 0 <= grid_y < grid_res:
+                    landmarks_x.append(grid_x)
+                    landmarks_y.append(grid_y)
+                else:
+                    offsets = self._disk_offsets_cache.get(radius_cells)
+                    if offsets is None:
+                        r2 = radius_cells * radius_cells
+                        offsets = [(dx, dy)
+                                   for dx in range(-radius_cells, radius_cells + 1)
+                                   for dy in range(-radius_cells, radius_cells + 1)
+                                   if dx*dx + dy*dy <= r2]
+                        self._disk_offsets_cache[radius_cells] = offsets
 
-            # Si visible par la caméra
-            if cam_min <= dist <= cam_max and angle_to_landmark <= cam_fov / 2:
-                # Discrétisation dans la grille
-                grid_x = int(round(coef * rel_pos[0]) + scale)
-                grid_y = int(round(coef * rel_pos[1]) + scale)
-
-                # Marquer la zone du landmark (cercle)
-                radius_cells = int(round(landmark.size * coef))
-                for dx in range(-radius_cells, radius_cells + 1):
-                    for dy in range(-radius_cells, radius_cells + 1):
-                        if dx**2 + dy**2 <= radius_cells**2:
-                            gx, gy = grid_x + dx, grid_y + dy
-                            if 0 <= gx < grid_res and 0 <= gy < grid_res:
-                                landmarks_x.append(gx)
-                                landmarks_y.append(gy)
-
-            # Si le robot est dessus (capteur sol)
-            if dist <= landmark.size:
-                grid_x = int(round(coef * rel_pos[0]) + scale)
-                grid_y = int(round(coef * rel_pos[1]) + scale)
-                landmarks_x.append(grid_x)
-                landmarks_y.append(grid_y)
+                    for dx, dy in offsets:
+                        gx = grid_x + dx
+                        gy = grid_y + dy
+                        if 0 <= gx < grid_res and 0 <= gy < grid_res:
+                            landmarks_x.append(gx)
+                            landmarks_y.append(gy)
         
         landmarks = [landmarks_x, landmarks_y]
-        landmarks_array = np.array(landmarks)
+        landmarks_array = np.array(landmarks, dtype=np.int32)
         
         observations = np.empty([5], dtype=object)
         observations[:] = [agent.state.p_vel, all_pos, camera_array, lidar_array, landmarks_array]
@@ -306,7 +338,7 @@ class Scenario(BaseScenario):
             grid_y = int(round(coef * pos[1]) + scale)
 
             # Marquer la zone du landmark (cercle)
-            radius_cells = int(round(patch.size * coef))
+            radius_cells = int(round(patch.state.size * coef))
             for dx in range(-radius_cells, radius_cells + 1):
                 for dy in range(-radius_cells, radius_cells + 1):
                     if dx**2 + dy**2 <= radius_cells**2:
@@ -320,5 +352,3 @@ class Scenario(BaseScenario):
         observations = np.empty([4], dtype=object)
         observations[:] = [agents_vel_x, agents_vel_y, other_pos, landmarks_array]
         return observations
-    
-    
