@@ -1,6 +1,6 @@
 #!/bin/sh
 env="MPE"
-scenario="rvr_spread_local_omni_walls" 
+scenario="rvr_spread_local_omni_walls_fast" 
 num_landmarks=5
 num_agents=5
 grid_resolution=81
@@ -11,7 +11,7 @@ stride=2
 kernel=9
 padding=0
 algo="rmappo" #"mappo" "ippo"
-exp="rvr_local_omni_12and5both0.15"
+exp="rvr_local_omni_12and5both_fast"
 seed_max=10
 project="rvr_spread_walls"
 

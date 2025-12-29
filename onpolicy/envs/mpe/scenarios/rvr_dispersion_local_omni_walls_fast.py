@@ -268,7 +268,7 @@ class Scenario(BaseScenario):
             grid_x = int(np.rint(coef * rel_pos[0]) + scale)
             grid_y = int(np.rint(coef * rel_pos[1]) + scale)
             
-            radius_cells = int(np.rint(landmark.state.size * coef))
+            radius_cells = int(np.rint(landmark.size * coef))
             if radius_cells <= 0:
                 if 0 <= grid_x < grid_res and 0 <= grid_y < grid_res:
                     landmarks_x.append(grid_x)
@@ -324,7 +324,7 @@ class Scenario(BaseScenario):
             grid_y = int(round(coef * pos[1]) + scale)
 
             # Marquer la zone du landmark (cercle)
-            radius_cells = int(round(patch.state.size * coef))
+            radius_cells = int(round(patch.size * coef))
             for dx in range(-radius_cells, radius_cells + 1):
                 for dy in range(-radius_cells, radius_cells + 1):
                     if dx**2 + dy**2 <= radius_cells**2:

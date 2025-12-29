@@ -1,8 +1,8 @@
 #!/bin/sh
 env="MPE"
-scenario="rvr_dispersion_local_omni_walls"
+scenario="rvr_dispersion_local_omni_walls_fast"
 num_landmarks=0
-num_agents=2
+num_agents=7
 grid_resolution=81
 grid_resolution_critic=81
 nb_additional_data=2

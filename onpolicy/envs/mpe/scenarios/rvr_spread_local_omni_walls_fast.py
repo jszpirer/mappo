@@ -201,7 +201,6 @@ class Scenario(BaseScenario):
 
         camera_coords = [1]
         lidar_coords = [1]
-        num_points = self.num_points * 12
         all_pos_x = []
         all_pos_y = []        
         
@@ -264,48 +263,53 @@ class Scenario(BaseScenario):
         landmarks_x = []
         landmarks_y = []
 
-        if not hasattr(self, "_disk_offsets_cache"):
-            self._disk_offsets_cache = {}
-            
         for landmark in world.landmarks:
             rel_pos = landmark.state.p_pos - agent_pos
-            dist2 = rel_pos[0]*rel_pos[0] + rel_pos[1]*rel_pos[1]
-            dot_ar = agent_dir[0]*rel_pos[0] + agent_dir[1]*rel_pos[1]
+            dist2 = np.dot(rel_pos, rel_pos)
 
-            camera = (cam_min2 <= dist2 <= cam_max2) and (dot_ar >= 0.0) and ((dot_ar * dot_ar) >= dist2 * cos_fov_half2)
+            # Vérification d'occlusion par les agents
+            occluded = False
+            for blocker in world.agents:
+                if blocker is agent:
+                    continue
+                blocker_vec = blocker.state.p_pos - agent_pos
+                blocker_dist2 = np.dot(blocker_vec, blocker_vec)
+                if blocker_dist2 < dist2 and np.dot(blocker_vec, rel_pos) > 0:
+                    c = rel_pos[0] * blocker_vec[1] - rel_pos[1] * blocker_vec[0]
+                    if c* c < (blocker.size * blocker.size) * dist2:
+                        occluded = True
+                        break
 
-            if not camera:
-                continue            
-            if camera and self._is_occluded(rel_pos, bvec, bdist2, bsize):
+            if occluded:
                 continue
-            
-            grid_x = int(np.rint(coef * rel_pos[0]) + scale)
-            grid_y = int(np.rint(coef * rel_pos[1]) + scale)
-            
-            radius_cells = int(np.rint(landmark.state.size * coef))
-            if radius_cells <= 0:
-                if 0 <= grid_x < grid_res and 0 <= grid_y < grid_res:
-                    landmarks_x.append(grid_x)
-                    landmarks_y.append(grid_y)
-                else:
-                    offsets = self._disk_offsets_cache.get(radius_cells)
-                    if offsets is None:
-                        r2 = radius_cells * radius_cells
-                        offsets = [(dx, dy)
-                                   for dx in range(-radius_cells, radius_cells + 1)
-                                   for dy in range(-radius_cells, radius_cells + 1)
-                                   if dx*dx + dy*dy <= r2]
-                        self._disk_offsets_cache[radius_cells] = offsets
 
-                    for dx, dy in offsets:
-                        gx = grid_x + dx
-                        gy = grid_y + dy
-                        if 0 <= gx < grid_res and 0 <= gy < grid_res:
-                            landmarks_x.append(gx)
-                            landmarks_y.append(gy)
+            # Si visible par la caméra
+            if cam_min2 <= dist2 <= cam_max2 :
+                dot_ar = agent_dir[0]*rel_pos[0] + agent_dir[1]*rel_pos[1]
+                if (dot_ar >= 0.0) and ((dot_ar*dot_ar) >= dist2 * cos_fov_half2) :
+                    # Discrétisation dans la grille
+                    grid_x = int(round(coef * rel_pos[0]) + scale)
+                    grid_y = int(round(coef * rel_pos[1]) + scale)
+
+                    # Marquer la zone du landmark (cercle)
+                    radius_cells = int(round(landmark.size * coef))
+                    for dx in range(-radius_cells, radius_cells + 1):
+                        for dy in range(-radius_cells, radius_cells + 1):
+                            if dx**2 + dy**2 <= radius_cells**2:
+                                gx, gy = grid_x + dx, grid_y + dy
+                                if 0 <= gx < grid_res and 0 <= gy < grid_res:
+                                    landmarks_x.append(gx)
+                                    landmarks_y.append(gy)
+
+            # Si le robot est dessus (capteur sol)
+            if dist2 <= landmark.size * landmark.size:
+                grid_x = int(round(coef * rel_pos[0]) + scale)
+                grid_y = int(round(coef * rel_pos[1]) + scale)
+                landmarks_x.append(grid_x)
+                landmarks_y.append(grid_y)
         
         landmarks = [landmarks_x, landmarks_y]
-        landmarks_array = np.array(landmarks, dtype=np.int32)
+        landmarks_array = np.array(landmarks)
         
         observations = np.empty([5], dtype=object)
         observations[:] = [agent.state.p_vel, all_pos, camera_array, lidar_array, landmarks_array]
@@ -338,7 +342,7 @@ class Scenario(BaseScenario):
             grid_y = int(round(coef * pos[1]) + scale)
 
             # Marquer la zone du landmark (cercle)
-            radius_cells = int(round(patch.state.size * coef))
+            radius_cells = int(round(patch.size * coef))
             for dx in range(-radius_cells, radius_cells + 1):
                 for dy in range(-radius_cells, radius_cells + 1):
                     if dx**2 + dy**2 <= radius_cells**2:
