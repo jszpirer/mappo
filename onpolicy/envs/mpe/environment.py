@@ -354,15 +354,15 @@ class MultiAgentEnv(gym.Env):
                 if 'agent' in entity.name:
                     geom.set_color(*entity.color, alpha=0.5)
 
-                    if self.world.use_directions:
-                        arrow = rendering.Arrow((entity.state.p_pos[0], entity.state.p_pos[1]),
-                                        entity.direction,
-                                        entity.size * 1.5,
-                                        entity.size * 0.5,
-                                        entity.size * 0.3)
-                        arrow.set_linewidth(0.5)
-                        arrow.add_attr(xform)
-                        self.render_geoms.append(arrow)                                     
+                    #if self.world.use_directions:
+                        #arrow = rendering.Arrow((entity.state.p_pos[0], entity.state.p_pos[1]),
+                                        #entity.direction,
+                                        #entity.size * 1.5,
+                                        #entity.size * 0.5,
+                                        #entity.size * 0.3)
+                        #arrow.set_linewidth(0.5)
+                        #arrow.add_attr(xform)
+                        #self.render_geoms.append(arrow)                                     
                     if not entity.silent:
                         dim_c = self.world.dim_c
                         # make circles to represent communication
