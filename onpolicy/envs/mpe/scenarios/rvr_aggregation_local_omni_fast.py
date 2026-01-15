@@ -69,6 +69,7 @@ class Scenario(BaseScenario):
     def reset_world(self, world):
         # random properties for agents
         world.assign_agent_colors()
+        world.assign_landmark_colors()
 
         # set random initial states
         for agent in world.agents:
@@ -187,7 +188,7 @@ class Scenario(BaseScenario):
 
     def observation(self, agent, world):
         cam_fov = np.deg2rad(130)
-        cam_min2, cam_max2 = 0.393 ** 2, 5.89 ** 2
+        cam_min2, cam_max2 = 0.0 ** 2, 5.89 ** 2
         lidar_min2, lidar_max2 = 0.118 ** 2, 2.77 ** 2
         walls_lidar_min2, walls_lidar_max2 = 0.118 ** 2, 7.86 ** 2
         cos_fov_half2 = np.cos(cam_fov/2) ** 2
