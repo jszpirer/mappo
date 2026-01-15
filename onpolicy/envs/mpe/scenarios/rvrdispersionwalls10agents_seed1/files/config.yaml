@@ -1,0 +1,219 @@
+_wandb:
+    value:
+        cli_version: 0.19.11
+        m: []
+        python_version: 3.9.21
+        t:
+            "1":
+                - 1
+                - 55
+            "2":
+                - 1
+                - 55
+            "3":
+                - 2
+                - 13
+                - 16
+                - 23
+                - 55
+                - 61
+            "4": 3.9.21
+            "5": 0.19.11
+            "8":
+                - 5
+            "10":
+                - 20
+            "12": 0.19.11
+            "13": linux-x86_64
+accept_ratio:
+    value: 0.5
+algorithm_name:
+    value: rmappo
+batch_size:
+    value: 128
+clip_param:
+    value: 0.2
+critic_lr:
+    value: 0.0007
+cuda:
+    value: true
+cuda_deterministic:
+    value: true
+curriculum_start:
+    value: 50000000
+data_chunk_length:
+    value: 10
+dec_actor:
+    value: false
+dim_actor:
+    value: 4
+discrete_action:
+    value: true
+encode_state:
+    value: false
+entropy_coef:
+    value: 0.01
+env_name:
+    value: MPE
+episode_length:
+    value: 125
+eval_episodes:
+    value: 32
+eval_interval:
+    value: 25
+eval_maps:
+    value: null
+experiment_name:
+    value: rvr_local_omni_12and5both_fast
+gae_lambda:
+    value: 0.95
+gain:
+    value: 0.01
+gamma:
+    value: 0.99
+grid_resolution:
+    value: 81
+grid_resolution_critic:
+    value: 81
+hidden_size:
+    value: 64
+huber_delta:
+    value: 10
+ifi:
+    value: 0.1
+kernel:
+    value: 9
+kl_threshold:
+    value: 0.01
+layer_N:
+    value: 1
+log_interval:
+    value: 5
+lr:
+    value: 0.0007
+ls_step:
+    value: 10
+max_grad_norm:
+    value: 10
+model_dir:
+    value: /localsc/jszpirer/362877/dispersion/50000000/files
+n_block:
+    value: 1
+n_embd:
+    value: 64
+n_eval_rollout_threads:
+    value: 1
+n_head:
+    value: 1
+n_render_rollout_threads:
+    value: 1
+n_rollout_threads:
+    value: 128
+n_training_threads:
+    value: 1
+nb_additional_data:
+    value: 2
+num_agents:
+    value: 10
+num_env_steps:
+    value: 100000000
+num_landmarks:
+    value: 0
+num_mini_batch:
+    value: 1
+num_output_channels:
+    value: 1
+obs_range:
+    value: 3
+omniscient_critic:
+    value: true
+opti_eps:
+    value: 1e-05
+output_comm:
+    value: 3
+output_entities:
+    value: 6
+output_other:
+    value: 0
+padding:
+    value: 0
+ppo_epoch:
+    value: 10
+project_name:
+    value: rvr_dispersion_walls_10agents
+range_noise:
+    value: 0
+recurrent_N:
+    value: 1
+render_episodes:
+    value: 5
+save_gifs:
+    value: false
+save_interval:
+    value: 1000000
+scenario_name:
+    value: rvr_dispersion_local_omni_walls_fast
+seed:
+    value: 1
+share_actor:
+    value: false
+share_policy:
+    value: true
+stacked_frames:
+    value: 1
+stride:
+    value: 2
+train_maps:
+    value: null
+use_ReLU:
+    value: false
+use_centralized_V:
+    value: true
+use_clipped_value_loss:
+    value: true
+use_directions:
+    value: true
+use_eval:
+    value: false
+use_feature_normalization:
+    value: true
+use_gae:
+    value: true
+use_huber_loss:
+    value: true
+use_linear_lr_decay:
+    value: false
+use_max_grad_norm:
+    value: true
+use_naive_recurrent_policy:
+    value: false
+use_obs_instead_of_state:
+    value: false
+use_orthogonal:
+    value: true
+use_policy_active_masks:
+    value: true
+use_popart:
+    value: false
+use_proper_time_limits:
+    value: false
+use_recurrent_policy:
+    value: true
+use_render:
+    value: false
+use_stacked_frames:
+    value: false
+use_value_active_masks:
+    value: true
+use_valuenorm:
+    value: true
+use_wandb:
+    value: true
+user_name:
+    value: jeanne-szpirer-universit-libre-de-bruxelles
+value_loss_coef:
+    value: 1
+weight_decay:
+    value: 0
+wheel_noise:
+    value: 0
