@@ -20,6 +20,7 @@ class Scenario(BaseScenario):
         world.omniscient_critic = True
         world.use_directions = args.use_directions
         world.discrete_actions = args.discrete_action
+        world.one_reward = True
         # add agents
         world.agents = [Agent() for i in range(world.num_agents)]
         for i, agent in enumerate(world.agents):
@@ -224,7 +225,7 @@ class Scenario(BaseScenario):
 
     def observation(self, agent, world):
         cam_fov = np.deg2rad(130)
-        cam_min2, cam_max2 = 0.0 ** 2, 5.89 ** 2
+        cam_min2, cam_max2 = 0.393 ** 2, 5.89 ** 2
         lidar_min2, lidar_max2 = 0.118 ** 2, 2.77 ** 2
         walls_lidar_min2, walls_lidar_max2 = 0.118 ** 2, 7.86 ** 2
         cos_fov_half2 = np.cos(cam_fov/2) ** 2
