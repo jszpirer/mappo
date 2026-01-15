@@ -243,7 +243,7 @@ class World(object):
                 # force = mass * a * action + n
                 p_force[i] = (
                     agent.mass * agent.accel if agent.accel is not None else agent.mass) * agent.action.u + noise
-                # if the agent has a specific direction, the force should take it into account
+                # if the agent has a specific direction, the force should be in the robot system of axis
                 if self.use_directions:
                     x = p_force[i][0]
                     y = p_force[i][1]

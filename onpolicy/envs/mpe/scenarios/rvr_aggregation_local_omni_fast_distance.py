@@ -12,14 +12,15 @@ class Scenario(BaseScenario):
         world.dim_c = 2
         world.limit = 4.33
         world.num_agents = args.num_agents
+        world.num_landmarks = 1
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.grid_resolution_critic = args.grid_resolution_critic
-        world.num_landmarks = args.num_landmarks 
         world.nb_additional_data = args.nb_additional_data
         world.omniscient_critic = True
         world.use_directions = args.use_directions
         world.discrete_actions = args.discrete_action
+        world.one_reward = True
         # add agents
         world.agents = [Agent() for i in range(world.num_agents)]
         for i, agent in enumerate(world.agents):
@@ -40,7 +41,7 @@ class Scenario(BaseScenario):
             landmark.name = 'landmark %d' % i
             landmark.collide = False
             landmark.movable = False
-            landmark.size = 0.15
+            landmark.size = 1
         # Walls
         side_length = 2.2414
         self.num_points = int(side_length/((4 * world.limit)/world.grid_resolution)) + 1
@@ -69,7 +70,6 @@ class Scenario(BaseScenario):
     def reset_world(self, world):
         # random properties for agents
         world.assign_agent_colors()
-
         world.assign_landmark_colors()
 
         # set random initial states
@@ -80,13 +80,14 @@ class Scenario(BaseScenario):
             agent.state.p_pos = np.array([r * np.cos(theta), r * np.sin(theta)])
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
+
+        # set random initial positions for the landmarks
         for landmark in world.landmarks:
-            # The agents should be initialized inside the dodecagone
-            r  = (4.0325 - 0.15) * np.sqrt(np.random.uniform(0, 1))
+            r  = (4.0325 - 1) * np.sqrt(np.random.uniform(0, 1))
             theta = np.random.uniform(0, 2 * np.pi)
             landmark.state.p_pos = np.array([r * np.cos(theta), r * np.sin(theta)])
             landmark.state.p_vel = np.zeros(world.dim_p)
-            
+
     def benchmark_data(self, agent, world):
         rew = 0
         collisions = 0
@@ -105,20 +106,23 @@ class Scenario(BaseScenario):
         dist_min = agent1.size + agent2.size
         return True if dist < dist_min else False
 
+    def is_onpatch(self, agent, world):
+        # Checks if the agent is on one of the patches of the aren
+        for patch in world.landmarks:
+            dist = np.sqrt(np.sum(np.square(agent.state.p_pos - patch.state.p_pos)))
+            if dist <= patch.size:
+                return True
+        return False
+
     def reward(self, agent, world):
         # Agents are rewarded based on minimum agent distance to each landmark, penalized for collisions
         rew = 0
-        for l in world.landmarks:
-            dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos)))
-                     for a in world.agents]
-            rew -= min(dists)
-
-        if agent.collide:
-            for a in world.agents:
-                if self.is_collision(a, agent):
-                    rew -= 1
+        for a in world.agents:
+            if not self.is_onpatch(a, world):
+                dist = np.sqrt(np.sum(np.square(a.state.p_pos - world.landmarks[0].state.p_pos)))
+                rew -= dist
         return rew
-    
+
     def discretize_wall(self, wall, grid_resolution):
         start, end = wall.start, wall.end
         length = np.linalg.norm(end - start)
@@ -162,7 +166,6 @@ class Scenario(BaseScenario):
 
         return bvec, bdist2, bsize, blocker_index_map
 
-
     @staticmethod
     def _is_occluded(rel_pos, bvec, bdist2, bsize, skip_index=None):
         if bvec.shape[0] == 0:
@@ -202,29 +205,29 @@ class Scenario(BaseScenario):
         camera_coords = [1]
         lidar_coords = [1]
         all_pos_x = []
-        all_pos_y = []        
-        
-        
+        all_pos_y = []
+
+
         max_target_dist2 = max(cam_max2, walls_lidar_max2)
         bvec, bdist2, bsize, blocker_index_map = self._prepare_blockers(agent, world, max_target_dist2)
-        
+
         for other in world.agents:
             if other is agent:
-                continue        
+                continue
             rel_pos = other.state.p_pos - agent_pos
             dist2 = rel_pos[0]*rel_pos[0] + rel_pos[1]*rel_pos[1]
             if dist2 == 0.0:
                 continue
             dot_ar = agent_dir[0]*rel_pos[0] + agent_dir[1]*rel_pos[1]
-            lidar = (lidar_min2 <= dist2 <= lidar_max2)            
-            camera = (cam_min2 <= dist2 <= cam_max2) and (dot_ar >= 0.0) and ((dot_ar*dot_ar) >= dist2 * cos_fov_half2)                
+            lidar = (lidar_min2 <= dist2 <= lidar_max2)
+            camera = (cam_min2 <= dist2 <= cam_max2) and (dot_ar >= 0.0) and ((dot_ar*dot_ar) >= dist2 * cos_fov_half2)
             if not (camera or lidar):
                 continue
 
             skip_idx = blocker_index_map.get(id(other), None)
             if self._is_occluded(rel_pos, bvec, bdist2, bsize, skip_index=skip_idx):
                 continue
-                
+
             grid_x = int(np.rint(coef * rel_pos[0]) + scale)
             grid_y = int(np.rint(coef * rel_pos[1]) + scale)
 
@@ -232,10 +235,10 @@ class Scenario(BaseScenario):
             all_pos_y.append(grid_y)
             camera_coords.append(1 if camera else 0)
             lidar_coords.append(1 if lidar else 0)
-        
+
         if not hasattr(self, "_wall_points_cache"):
             self._wall_points_cache = {}
-        
+
         for wall in world.walls:
             wid = id(wall)
             if wid not in self._wall_points_cache:
@@ -245,7 +248,7 @@ class Scenario(BaseScenario):
                 rel_pos = point - agent_pos
                 dist2 = rel_pos[0]*rel_pos[0] + rel_pos[1]*rel_pos[1]
                 if not (lidar_min2 <= dist2 <= walls_lidar_max2):
-                    continue                
+                    continue
                 if self._is_occluded(rel_pos, bvec, bdist2, bsize):
                     continue
                 grid_x = int(np.rint(coef * rel_pos[0]) + scale)
@@ -255,7 +258,6 @@ class Scenario(BaseScenario):
                 all_pos_y.append(grid_y)
                 camera_coords.append(0)
                 lidar_coords.append(1)
-        
         all_pos = np.array([all_pos_x, all_pos_y], dtype=np.int32)
         camera_array = np.asarray(camera_coords, dtype=np.int32)
         lidar_array  = np.asarray(lidar_coords,  dtype=np.int32)
@@ -307,15 +309,15 @@ class Scenario(BaseScenario):
                 grid_y = int(round(coef * rel_pos[1]) + scale)
                 landmarks_x.append(grid_x)
                 landmarks_y.append(grid_y)
-        
+
         landmarks = [landmarks_x, landmarks_y]
         landmarks_array = np.array(landmarks)
-        
+
         observations = np.empty([5], dtype=object)
         observations[:] = [agent.state.p_vel, all_pos, camera_array, lidar_array, landmarks_array]
         return observations
-    
-    
+
+
     def critic_observation(self, world):
         # Critic's observations are the same not matter which robot is used
         # For velocities, need to know in which liste the indices of the grid are
@@ -352,7 +354,9 @@ class Scenario(BaseScenario):
                             landmarks_y.append(gy)
         landmarks = [landmarks_x, landmarks_y]
         landmarks_array = np.array(landmarks)
-        
+
         observations = np.empty([4], dtype=object)
         observations[:] = [agents_vel_x, agents_vel_y, other_pos, landmarks_array]
         return observations
+
+
