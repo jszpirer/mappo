@@ -290,10 +290,6 @@ class World(object):
                     entity.state.p_vel = entity.state.p_vel / np.sqrt(np.square(entity.state.p_vel[0]) +
                                                                       np.square(entity.state.p_vel[1])) * entity.max_speed
             entity.state.p_pos += entity.state.p_vel * self.dt
-            if self.use_directions:
-                # New direction after the moving step
-                entity.direction = np.arctan2(entity.state.p_vel[0], entity.state.p_vel[1])
-                entity.direction = np.mod(entity.direction, 2 * np.pi)
             if abs(entity.state.p_pos[0]) > (self.limit - entity.size):
                 if entity.state.p_pos[0] > (self.limit - entity.size):
                     entity.state.p_pos[0] = self.limit - entity.size
@@ -304,6 +300,17 @@ class World(object):
                     entity.state.p_pos[1] = self.limit - entity.size
                 else:
                     entity.state.p_pos[1] = - (self.limit - entity.size)
+            if self.use_directions:
+                # New direction after the moving step (need to take into account that the robot while follow a circle)
+                # entity.direction = np.arctan2(entity.state.p_vel[0], entity.state.p_vel[1])
+                # entity.direction = np.mod(entity.direction, 2 * np.pi)
+                # Need the new position in the robot system
+                x_B = cos(entity.direction) * entity.state.p_pos[0] + sin(entity.direction) * entity.state.p_pos[1]
+                y_B = -sin(entity.direction) * entity.state.p_pos[0] + cos(entity.direction) * entity.state.p_pos[1]
+                alpha = arctan2(y_B, x_B)
+                theta = np.pi - 2 * alpha
+                entity.direction += theta
+                entity.direction = np.mod(entity.direction, 2 * np.pi)
 
     def update_agent_state(self, agent):
         # set communication state (directly for now)
