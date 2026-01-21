@@ -67,46 +67,80 @@ class Scenario(BaseScenario):
         self.reset_world(world)
         return world
 
-    def place_landmarks(self, world, R=4.0325 - 0.15, n_anneaux=3, jitter=0.3):
+    
+    def place_landmarks(self, world, R=4.0325 - 0.15, n_anneaux=3, jitter=0.3, seed=None):
         """
-        Place les landmarks dans un cercle (approximation du dodecagone) en utilisant
-        la technique anneaux + secteurs.
+        Place les landmarks dans des anneaux et secteurs, en évitant l'alignement.
+        - Répartition en aire égale par anneau.
+        - Décalage angulaire par anneau (stagger).
+        - Échantillonnage uniforme à l'intérieur de chaque secteur d'anneau.
+        - 'jitter' sert d'élargissement angulaire/radial relatif du secteur.
         """
+        import numpy as np
+        if seed is not None:
+            np.random.seed(seed)
+    
         n_landmarks = len(world.landmarks)
-        n_secteurs = n_landmarks // n_anneaux
-        if n_secteurs == 0:
-            n_secteurs = n_landmarks  # fallback si peu de landmarks
-  
-        # Calcul des bords radiaux (aire égale)
+    
+        # Nombre de secteurs de base (peut être affiné par anneau si tu veux)
+        n_secteurs = max(1, n_landmarks // n_anneaux)  # fallback si peu de landmarks
+    
+        # Bords radiaux à aire égale
         r_edges = [R * np.sqrt(k / n_anneaux) for k in range(n_anneaux + 1)]
-        dtheta = 2 * np.pi / n_secteurs
-  
+    
+        # Taille angulaire de base
+        dtheta_base = 2 * np.pi / n_secteurs
+    
         idx = 0
         for i_ring in range(n_anneaux):
+            if idx >= n_landmarks:
+                break
+    
             r_in, r_out = r_edges[i_ring], r_edges[i_ring + 1]
-            r_center = (r_in + r_out) / 2.0
-            r_halfspan = (r_out - r_in) / 2.0
-  
+    
+            # Décalage angulaire par anneau pour casser les alignements (stagger).
+            # Tu peux mettre random offset si tu préfères: theta_offset_ring = np.random.rand() * dtheta_base
+            theta_offset_ring = (i_ring * dtheta_base) / 2.0
+    
             for i_sec in range(n_secteurs):
                 if idx >= n_landmarks:
                     break
-                theta_center = (i_sec + 0.5) * dtheta
-                theta_halfspan = dtheta / 2.0
-  
-                # Jitter radial et angulaire
-                dr = (2 * np.random.rand() - 1) * jitter * r_halfspan
-                dth = (2 * np.random.rand() - 1) * jitter * theta_halfspan
-  
-                r = np.clip(r_center + dr, 0, R)
-                theta = (theta_center + dth) % (2 * np.pi)
-  
+    
+                # Secteur nominal
+                theta_start = theta_offset_ring + i_sec * dtheta_base
+                theta_end   = theta_start + dtheta_base
+    
+                # Optionnel: élargir/resserrer le secteur via 'jitter' (borne 0..1)
+                # Ici, on élargit angulairement et radialement autour du secteur nominal.
+                angular_expand = jitter * 0.5  # 0.3 => +/-15% de dtheta_base
+                radial_expand  = jitter * 0.25 # 0.3 => +/-7.5% de largeur radiale
+    
+                # On calcule un mini-secteur effectif
+                dtheta_eff = dtheta_base * (1 + 2 * angular_expand)
+                theta_mid  = (theta_start + theta_end) / 2.0
+                theta_start_eff = theta_mid - dtheta_eff / 2.0
+                theta_end_eff   = theta_mid + dtheta_eff / 2.0
+    
+                # Largeur radiale + expansion
+                dr_nom = (r_out - r_in)
+                r_in_eff  = max(0.0, r_in  - radial_expand * dr_nom)
+                r_out_eff = min(R,   r_out + radial_expand * dr_nom)
+    
+                # Échantillonnage uniforme en aire dans l’anneau [r_in_eff, r_out_eff]
+                u = np.random.rand()
+                v = np.random.rand()
+                r = np.sqrt(u * (r_out_eff**2 - r_in_eff**2) + r_in_eff**2)
+    
+                # Échantillonnage uniforme angulaire dans [theta_start_eff, theta_end_eff]
+                theta = theta_start_eff + v * (theta_end_eff - theta_start_eff)
+    
                 x = r * np.cos(theta)
                 y = r * np.sin(theta)
-  
-                landmark = world.landmarks[idx]
-                landmark.state.p_pos = np.array([x, y])
-                landmark.state.p_vel = np.zeros(world.dim_p)
-  
+    
+                lm = world.landmarks[idx]
+                lm.state.p_pos = np.array([x, y])
+                lm.state.p_vel = np.zeros(world.dim_p)
+    
                 idx += 1
   
     def reset_world(self, world):
