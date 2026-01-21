@@ -67,47 +67,47 @@ class Scenario(BaseScenario):
         self.reset_world(world)
         return world
 
-  def place_landmarks(world, R=4.0325 - 0.15, n_anneaux=3, jitter=0.3):
-      """
-      Place les landmarks dans un cercle (approximation du dodecagone) en utilisant
-      la technique anneaux + secteurs.
-      """
-      n_landmarks = len(world.landmarks)
-      n_secteurs = n_landmarks // n_anneaux
-      if n_secteurs == 0:
-          n_secteurs = n_landmarks  # fallback si peu de landmarks
+    def place_landmarks(self, world, R=4.0325 - 0.15, n_anneaux=3, jitter=0.3):
+        """
+        Place les landmarks dans un cercle (approximation du dodecagone) en utilisant
+        la technique anneaux + secteurs.
+        """
+        n_landmarks = len(world.landmarks)
+        n_secteurs = n_landmarks // n_anneaux
+        if n_secteurs == 0:
+            n_secteurs = n_landmarks  # fallback si peu de landmarks
   
-      # Calcul des bords radiaux (aire égale)
-      r_edges = [R * np.sqrt(k / n_anneaux) for k in range(n_anneaux + 1)]
-      dtheta = 2 * np.pi / n_secteurs
+        # Calcul des bords radiaux (aire égale)
+        r_edges = [R * np.sqrt(k / n_anneaux) for k in range(n_anneaux + 1)]
+        dtheta = 2 * np.pi / n_secteurs
   
-      idx = 0
-      for i_ring in range(n_anneaux):
-          r_in, r_out = r_edges[i_ring], r_edges[i_ring + 1]
-          r_center = (r_in + r_out) / 2.0
-          r_halfspan = (r_out - r_in) / 2.0
+        idx = 0
+        for i_ring in range(n_anneaux):
+            r_in, r_out = r_edges[i_ring], r_edges[i_ring + 1]
+            r_center = (r_in + r_out) / 2.0
+            r_halfspan = (r_out - r_in) / 2.0
   
-          for i_sec in range(n_secteurs):
-              if idx >= n_landmarks:
-                  break
-              theta_center = (i_sec + 0.5) * dtheta
-              theta_halfspan = dtheta / 2.0
+            for i_sec in range(n_secteurs):
+                if idx >= n_landmarks:
+                    break
+                theta_center = (i_sec + 0.5) * dtheta
+                theta_halfspan = dtheta / 2.0
   
-              # Jitter radial et angulaire
-              dr = (2 * np.random.rand() - 1) * jitter * r_halfspan
-              dth = (2 * np.random.rand() - 1) * jitter * theta_halfspan
+                # Jitter radial et angulaire
+                dr = (2 * np.random.rand() - 1) * jitter * r_halfspan
+                dth = (2 * np.random.rand() - 1) * jitter * theta_halfspan
   
-              r = np.clip(r_center + dr, 0, R)
-              theta = (theta_center + dth) % (2 * np.pi)
+                r = np.clip(r_center + dr, 0, R)
+                theta = (theta_center + dth) % (2 * np.pi)
   
-              x = r * np.cos(theta)
-              y = r * np.sin(theta)
+                x = r * np.cos(theta)
+                y = r * np.sin(theta)
   
-              landmark = world.landmarks[idx]
-              landmark.state.p_pos = np.array([x, y])
-              landmark.state.p_vel = np.zeros(world.dim_p)
+                landmark = world.landmarks[idx]
+                landmark.state.p_pos = np.array([x, y])
+                landmark.state.p_vel = np.zeros(world.dim_p)
   
-              idx += 1
+                idx += 1
   
     def reset_world(self, world):
         # random properties for agents

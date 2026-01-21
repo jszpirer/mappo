@@ -307,7 +307,7 @@ class World(object):
                 # Need the new position in the robot system
                 x_B = cos(entity.direction) * entity.state.p_pos[0] + sin(entity.direction) * entity.state.p_pos[1]
                 y_B = -sin(entity.direction) * entity.state.p_pos[0] + cos(entity.direction) * entity.state.p_pos[1]
-                alpha = arctan2(y_B, x_B)
+                alpha = np.arctan2(y_B, x_B)
                 theta = np.pi - 2 * alpha
                 entity.direction += theta
                 entity.direction = np.mod(entity.direction, 2 * np.pi)
