@@ -68,81 +68,73 @@ class Scenario(BaseScenario):
         return world
 
     
-    def place_landmarks(self, world, R=4.0325 - 0.15, n_anneaux=3, jitter=0.3, seed=None):
+    def place_landmarks_sectors_with_dmin(
+        self, world,
+        R=3.88,          # rayon de l’arène
+        jitter=0.25,     # jitter angulaire
+        d_min=0.7,       # distance minimale
+        max_tries=50,    # essais par landmark
+        seed=None
+    ):
         """
-        Place les landmarks dans des anneaux et secteurs, en évitant l'alignement.
-        - Répartition en aire égale par anneau.
-        - Décalage angulaire par anneau (stagger).
-        - Échantillonnage uniforme à l'intérieur de chaque secteur d'anneau.
-        - 'jitter' sert d'élargissement angulaire/radial relatif du secteur.
+        Placement par secteurs + jitter + distance minimale garantie.
+        - 1 landmark par secteur
+        - jitter angulaire pour éviter l’alignement
+        - distance minimale imposée entre landmarks
         """
-        import numpy as np
         if seed is not None:
             np.random.seed(seed)
     
-        n_landmarks = len(world.landmarks)
+        N = len(world.landmarks)
+        dtheta = 2 * np.pi / N
     
-        # Nombre de secteurs de base (peut être affiné par anneau si tu veux)
-        n_secteurs = max(1, n_landmarks // n_anneaux)  # fallback si peu de landmarks
+        # Décalage global anti-alignement
+        theta_offset = np.random.uniform(0, dtheta)
     
-        # Bords radiaux à aire égale
-        r_edges = [R * np.sqrt(k / n_anneaux) for k in range(n_anneaux + 1)]
+        positions = []
     
-        # Taille angulaire de base
-        dtheta_base = 2 * np.pi / n_secteurs
+        for i in range(N):
     
-        idx = 0
-        for i_ring in range(n_anneaux):
-            if idx >= n_landmarks:
-                break
+            theta_start = theta_offset + i * dtheta
+            theta_end   = theta_start + dtheta
+            theta_mid   = 0.5 * (theta_start + theta_end)
     
-            r_in, r_out = r_edges[i_ring], r_edges[i_ring + 1]
+            # Largeur angulaire étendue par jitter
+            ang_width = dtheta * (1 + jitter)
     
-            # Décalage angulaire par anneau pour casser les alignements (stagger).
-            # Tu peux mettre random offset si tu préfères: theta_offset_ring = np.random.rand() * dtheta_base
-            theta_offset_ring = (i_ring * dtheta_base) / 2.0
+            # On tente plusieurs tirages pour respecter d_min
+            for _ in range(max_tries):
     
-            for i_sec in range(n_secteurs):
-                if idx >= n_landmarks:
-                    break
+                # Échantillonnage angulaire avec jitter
+                theta = theta_mid + np.random.uniform(-1, 1) * (ang_width / 2)
     
-                # Secteur nominal
-                theta_start = theta_offset_ring + i_sec * dtheta_base
-                theta_end   = theta_start + dtheta_base
-    
-                # Optionnel: élargir/resserrer le secteur via 'jitter' (borne 0..1)
-                # Ici, on élargit angulairement et radialement autour du secteur nominal.
-                angular_expand = jitter * 0.5  # 0.3 => +/-15% de dtheta_base
-                radial_expand  = jitter * 0.25 # 0.3 => +/-7.5% de largeur radiale
-    
-                # On calcule un mini-secteur effectif
-                dtheta_eff = dtheta_base * (1 + 2 * angular_expand)
-                theta_mid  = (theta_start + theta_end) / 2.0
-                theta_start_eff = theta_mid - dtheta_eff / 2.0
-                theta_end_eff   = theta_mid + dtheta_eff / 2.0
-    
-                # Largeur radiale + expansion
-                dr_nom = (r_out - r_in)
-                r_in_eff  = max(0.0, r_in  - radial_expand * dr_nom)
-                r_out_eff = min(R,   r_out + radial_expand * dr_nom)
-    
-                # Échantillonnage uniforme en aire dans l’anneau [r_in_eff, r_out_eff]
-                u = np.random.rand()
-                v = np.random.rand()
-                r = np.sqrt(u * (r_out_eff**2 - r_in_eff**2) + r_in_eff**2)
-    
-                # Échantillonnage uniforme angulaire dans [theta_start_eff, theta_end_eff]
-                theta = theta_start_eff + v * (theta_end_eff - theta_start_eff)
+                # Rayon ~ distribution uniforme en aire
+                r = R * np.sqrt(np.random.uniform())
     
                 x = r * np.cos(theta)
                 y = r * np.sin(theta)
+                p = np.array([x, y])
     
-                lm = world.landmarks[idx]
-                lm.state.p_pos = np.array([x, y])
-                lm.state.p_vel = np.zeros(world.dim_p)
+                # Vérifier la distance minimale
+                ok = True
+                for q in positions:
+                    if np.linalg.norm(p - q) < d_min:
+                        ok = False
+                        break
     
-                idx += 1
-  
+                if ok:
+                    positions.append(p)
+                    break
+    
+            # Si on n'a rien trouvé : fallback (on accepte le dernier test)
+            else:
+                positions.append(p)
+    
+        # Assigner les positions aux landmarks
+        for lm, pos in zip(world.landmarks, positions):
+            lm.state.p_pos = pos
+            lm.state.p_vel = np.zeros(world.dim_p)
+    
     def reset_world(self, world):
         # random properties for agents
         world.assign_agent_colors()
@@ -157,7 +149,7 @@ class Scenario(BaseScenario):
             agent.state.p_pos = np.array([r * np.cos(theta), r * np.sin(theta)])
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
-        self.place_landmarks(world)
+        self.place_landmarks_sectors_with_dmin(world)
             
     def benchmark_data(self, agent, world):
         rew = 0

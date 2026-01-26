@@ -17,7 +17,7 @@ project="rvr_aggregation_walls_5agents_distance"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in 1
+for seed in 3
 do
     echo "seed is ${seed}:"
     TORCH_USE_CUDA_DSA=1 CUDA_LAUNCH_BLOCKING=1 CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
