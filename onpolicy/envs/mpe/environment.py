@@ -23,6 +23,7 @@ class MultiAgentEnv(gym.Env):
 
         self.world = world
         self.world_length = self.world.world_length
+        self.sensivity = self.world.sensivity
         self.current_step = 0
         self.agents = self.world.policy_agents
         # set required vectorized gym env property
@@ -272,7 +273,7 @@ class MultiAgentEnv(gym.Env):
                     agent.action.u = action[0][0:self.world.dim_p]
                     d = self.world.dim_p
 
-            sensitivity = 1.7
+            sensitivity = self.sensivity
             if agent.accel is not None:
                 sensitivity = agent.accel
             agent.action.u *= sensitivity
