@@ -1,7 +1,7 @@
 #!/bin/sh
 env="MPE"
-scenario="rvr_spread_local_omni_walls_fast" 
-num_landmarks=5
+scenario="rvr_spread_local_omni_walls_fast_cells" 
+num_landmarks=4
 num_agents=5
 grid_resolution=81
 grid_resolution_critic=81
@@ -13,7 +13,7 @@ padding=0
 algo="rmappo" #"mappo" "ippo"
 exp="rvr_local_omni_12and5both_fast"
 seed_max=10
-project="rvr_spread_walls"
+project="rvr_spread_walls_cells_5agents"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;

@@ -17,13 +17,13 @@ project="rvr_aggregation_walls_5agents_distance"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in 3
+for seed in 1
 do
     echo "seed is ${seed}:"
     TORCH_USE_CUDA_DSA=1 CUDA_LAUNCH_BLOCKING=1 CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
     --scenario_name ${scenario} --num_agents ${num_agents} --num_landmarks ${num_landmarks} --seed ${seed} \
     --n_training_threads 1 --n_rollout_threads 128 --num_mini_batch 1 --episode_length 125 --num_env_steps 100000000\
-    --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
+    --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-5 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
     --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --wheel_noise ${noise} \
     --stride ${stride} --kernel ${kernel} --save_interval 1000000 --grid_resolution_critic ${grid_resolution_critic} --omniscient_critic --use_directions --dim_actor 4 --padding ${padding}
 done
