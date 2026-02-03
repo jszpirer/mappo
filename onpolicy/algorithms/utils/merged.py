@@ -109,7 +109,10 @@ class MergedModel(nn.Module):
        input_size = flattened_size + mlp_args.nb_additional_data*2
        if "local" in self.experiment_name:
             input_size = flattened_size + mlp_args.nb_additional_data
-
+       if "coverage" in self.experiment_name:
+            #only the local case for now
+            input_size = flattened_size - num_landmarks_features + mlp_args.nb_additional_data
+            self.dim_actor = 2
        if self.omniscient_critic and self.critic:
             self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
             self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
@@ -142,6 +145,11 @@ class MergedModel(nn.Module):
                     x2 = self.cnn2([x[3]])
                     x_inter = cat((x1, x2), dim=1)
                     #x_inter = x1
+                elif "coverage" in self.experiment_name:
+                    velocity = x[i*self.dim_actor + 0]
+
+                    x1 = self.cnn1(x[i*self.dim_actor + 1])
+                    x_inter = cat((velocity, x1), dim=1)
                 else:
                     velocity = x[i*self.dim_actor + 0]
 

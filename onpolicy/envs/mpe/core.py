@@ -146,6 +146,7 @@ class World(object):
         self.nb_additional_data = 0
         self.omniscient_critic = False
         self.discrete_actions = True
+        self.sensivity = 1.7
 
     # return all entities in the world
     @property
