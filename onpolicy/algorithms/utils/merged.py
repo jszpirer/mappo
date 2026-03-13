@@ -112,12 +112,21 @@ class MergedModel(nn.Module):
        if "coverage" in self.experiment_name:
             #only the local case for now
             flattened_size -= num_landmarks_features
-            input_size = flattened_size + mlp_args.nb_additional_data
-            self.dim_actor = 2
+            if "local" in self.experiment_name:
+                input_size = flattened_size + mlp_args.nb_additional_data
+                self.dim_actor = 2
+            else:
+                input_size = flattened_size + 2*mlp_args.nb_additional_data
+                self.dim_actor = 3
        if self.omniscient_critic and self.critic:
-            self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
-            self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
-            input_size = 17
+            if "rvr" in self.experiment_name:
+                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
+                self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
+                input_size = 17
+            else:
+                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                self.dim_actor = 1
+                input_size -= 2
        else:
             if "rvr" in self.experiment_name:
                 self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3, padding_size=padding_actor)
@@ -141,16 +150,20 @@ class MergedModel(nn.Module):
         x_inter_list = []
         for i in range(len(x)//(self.dim_actor)):
             if "local" in self.experiment_name:
-                if self.critic and self.omniscient_critic:
+                if self.critic and self.omniscient_critic and "rvr" in self.experiment_name:
                     x1 = self.cnn1(x[:3])
                     x2 = self.cnn2([x[3]])
                     x_inter = cat((x1, x2), dim=1)
                     #x_inter = x1
                 elif "coverage" in self.experiment_name:
-                    velocity = x[i*self.dim_actor + 0]
+                    if self.critic and self.omniscient_critic:
+                        x1 = self.cnn1([x[0]])
+                        x_inter = x1
+                    else:
+                        velocity = x[i*self.dim_actor + 0]
 
-                    x1 = self.cnn1([x[i*self.dim_actor + 1]])
-                    x_inter = cat((velocity, x1), dim=1)
+                        x1 = self.cnn1([x[i*self.dim_actor + 1]])
+                        x_inter = cat((velocity, x1), dim=1)
                 else:
                     velocity = x[i*self.dim_actor + 0]
 
@@ -163,11 +176,11 @@ class MergedModel(nn.Module):
                         x1 = self.cnn1([x[i*self.dim_actor + 1]])
                         x_inter = cat((velocity, x1), dim=1)
             else:
-                velocity = x[i*self.dim_actor + 0]
+                position = x[i*self.dim_actor + 0]
 
-                position = x[i*self.dim_actor + 1]
+                velocity = x[i*self.dim_actor + 1]
 
-                x1 = self.cnn1(x[i*self.dim_actor + 2])
+                x1 = self.cnn1([x[i*self.dim_actor + 2]])
 
                 x_inter = cat((velocity, position, x1), dim=1)
             x_inter_list.append(x_inter)
