@@ -14,6 +14,9 @@ class Scenario(BaseScenario):
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.nb_additional_data = args.nb_additional_data
+        world.omniscient_critic = False
+        world.use_directions = False
+        world.sensivity = 5.0
         # add agents
         world.agents = [Agent() for i in range(world.num_agents)]
         for i, agent in enumerate(world.agents):
@@ -62,12 +65,7 @@ class Scenario(BaseScenario):
             if a is agent:
                 continue
             dists.append(np.sqrt(np.sum(np.square(a.state.p_pos - agent.state.p_pos))))
-        rew = min(dists)
-
-        if agent.collide:
-            for a in world.agents:
-                if self.is_collision(a, agent):
-                    rew -= 1
+        rew = -max(dists)
         return rew
 
     def observation(self, agent, world):

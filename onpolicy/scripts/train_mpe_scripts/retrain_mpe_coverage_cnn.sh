@@ -1,21 +1,22 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_coverage_cnn_sparse" 
+scenario="simple_coverage_cnn_sparse_localj_proximity" 
 num_landmarks=0
-num_agents=10
+num_agents=5
 grid_resolution=77
+grid_resolution_critic=77
 nb_additional_data=2
 noise=0
 stride=2
 kernel=7
 algo="rmappo" #"mappo" "ippo"
-exp="simple_coverage_cnn_sparse77"
+exp="local_coverage_afterICRA_proximity"
 seed_max=5
-project="simple_coverage_10agents"
+project="simple_coverage_5agents"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in 10
+for seed in 1
 do
     echo "seed is ${seed}:"
     CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
@@ -24,6 +25,6 @@ do
     --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
     --grid_resolution ${grid_resolution} --nb_additional_data ${nb_additional_data} --wheel_noise ${noise} \
     --stride ${stride} --kernel ${kernel} --save_interval 1000000 \
-    --curriculum_start 50000000 \
-    --model_dir "${TMPDIR}/coverage/50000000/files"
+    --curriculum_start 50000000 --grid_resolution_critic ${grid_resolution_critic} \
+    --model_dir "/home/thales/jszpirer/sugar/mappo/onpolicy/scripts/results/MPE/simple_coverage_cnn_sparse_localj_proximity/rmappo/local_coverage_afterICRA_proximity/wandb/run-20260205_141058-7jwfu6ai/files"
 done

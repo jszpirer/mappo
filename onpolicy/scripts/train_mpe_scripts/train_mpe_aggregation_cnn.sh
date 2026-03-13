@@ -10,13 +10,13 @@ noise=0
 stride=2
 kernel=7
 algo="rmappo" #"mappo" "ippo"
-exp="aggregation_afterICRA"
+exp="local_aggregation_coverage_afterICRA"
 seed_max=5
 project="epuck_aggregation_5agents"
 
 echo "env is ${env}, scenario is ${scenario}, algo is ${algo}, exp is ${exp}, max seed is ${seed_max}"
 # for seed in `seq ${seed_max}`;
-for seed in 2
+for seed in 1
 do
     echo "seed is ${seed}:"
     CUDA_VISIBLE_DEVICES=0 python ../train/train_mpe.py --env_name ${env} --algorithm_name ${algo} --experiment_name ${exp} \
