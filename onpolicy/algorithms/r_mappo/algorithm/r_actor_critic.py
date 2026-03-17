@@ -42,6 +42,7 @@ class R_Actor(nn.Module):
         self._use_naive_recurrent_policy = args.use_naive_recurrent_policy
         self._use_recurrent_policy = args.use_recurrent_policy
         self._recurrent_N = args.recurrent_N
+        self.padding = args.attention_actor
         self.tpdv = dict(dtype=torch.float32, device=device)
         self.device = device
 
@@ -72,20 +73,22 @@ class R_Actor(nn.Module):
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
         list_obs = []
-        multi_channels = False
+        list_padding = []
         for i in range(len(obs[0])):
-            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4:
+            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
                 indice_grid = int(obs[0][i][0])
-                obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
+                obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
-                obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
+                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding)
             list_obs.append(obs_to_add)
-        rnn_states = check(rnn_states, self.grid_size, self.device)
-        masks = check(masks, self.grid_size, self.device)
+            if padding_to_add is not None:
+                list_padding.append(padding_to_add)
+        rnn_states, _ = check(rnn_states, self.grid_size, self.device)
+        masks, _ = check(masks, self.grid_size, self.device)
         if available_actions is not None:
-            available_actions = check(available_actions, self.grid_size, self.device)
+            available_actions, _ = check(available_actions, self.grid_size, self.device)
 
-        actor_features = self.base(list_obs)
+        actor_features = self.base(list_obs, mask=list_padding)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             rnn_states = rnn_states
@@ -110,23 +113,26 @@ class R_Actor(nn.Module):
         :return dist_entropy: (torch.Tensor) action distribution entropy for the given inputs.
         """
         list_obs = []
+        list_padding = []
         for i in range(len(obs[0])):
-            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4:
+            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
                 indice_grid = int(obs[0][i][0])
-                obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
+                obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
-                obs_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device)
+                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding)
             list_obs.append(obs_to_add)
-        rnn_states = check(rnn_states, self.grid_size, self.device)
-        action = check(action, self.grid_size, self.device)
-        masks = check(masks, self.grid_size, self.device)
+            if padding_to_add is not None:
+                list_padding.append(padding_to_add)
+        rnn_states, _ = check(rnn_states, self.grid_size, self.device)
+        action, _ = check(action, self.grid_size, self.device)
+        masks, _ = check(masks, self.grid_size, self.device)
         if available_actions is not None:
-            available_actions = check(available_actions, self.grid_size, self.device)
+            available_actions, _ = check(available_actions, self.grid_size, self.device)
 
         if active_masks is not None:
-            active_masks = check(active_masks, self.grid_size, self.device)
+            active_masks, _ = check(active_masks, self.grid_size, self.device)
 
-        actor_features = self.base(list_obs)
+        actor_features = self.base(list_obs, mask=list_padding)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
@@ -172,6 +178,7 @@ class R_Critic(nn.Module):
         self.device = device
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][self._use_orthogonal]
         self.omniscient_critic = args.omniscient_critic
+        self.padding = args.attention_critic
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
         base = MergedModel
@@ -202,18 +209,18 @@ class R_Critic(nn.Module):
         """
         list_cent_obs = []
         for i in range(len(cent_obs[0])):
-            if self.omniscient_critic and len(cent_obs[0][i].shape) == 1 and i != 3:
+            if self.omniscient_critic and len(cent_obs[0][i].shape) == 1 and i != 3 and not self.padding:
                 # In this case the observation is values for a grid, to know which one: check the first element of the observation
                 indice_grid = int(cent_obs[0][i][0])
-                cent_obs_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
+                cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
             else:
-                cent_obs_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device)
+                cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding)
             list_cent_obs.append(cent_obs_to_add)
-        rnn_states = check(rnn_states, -1, self.device)
+        rnn_states, _ = check(rnn_states, -1, self.device)
         if self.omniscient_critic:
-            masks = check(masks[:rnn_states.size()[0]], -1, self.device)
+            masks, _ = check(masks[:rnn_states.size()[0]], -1, self.device)
         else:
-            masks = check(masks, -1, self.device)
+            masks, _ = check(masks, -1, self.device)
 
         critic_features = self.base(list_cent_obs)
 

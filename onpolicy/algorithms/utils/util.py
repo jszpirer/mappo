@@ -26,15 +26,33 @@ def init(module, weight_init, bias_init, gain=1):
 def get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
-def check(input, grid_size, device, list_values=None):
+def check(input, grid_size, device, list_values=None, padding=False):
     if isinstance(input, torch.Tensor):
-        return input.to(device)
+        return input.to(device), None
     if isinstance(input, np.ndarray):
         if input.dtype == object:
-            return torch.from_numpy(np.array(input, dtype=np.float32)).to(device)
-        return torch.from_numpy(input).to(device)
+            return torch.from_numpy(np.array(input, dtype=np.float32)).to(device), None
+        return torch.from_numpy(input).to(device), None
     if len(input[0].shape) == 1:
-        return torch.tensor(np.array(input, dtype=np.float32)).to(device)
+        return torch.tensor(np.array(input, dtype=np.float32)).to(device), None
+    if padding:
+        # In this case, attention mechanism and padding needed to do batch operations
+        batch_size = len(input)
+        n_max = max(a.shape[0] for a in input)
+
+        # Pre allocation for the final batch tensors
+        batch = torch.full((batch_size, n_max, 2), fill_value=0, dtype=torch.float32, device=device)
+        mask_padding = torch.ones((batch_size, n_max), dtype=torch.bool, device=device)
+
+        # Filling in the tensors
+        for i, arr in enumerate(input):
+            n_i = arr.shape[0]
+            t = torch.as_tensor(arr, device=device)
+            if t.dtype != torch.float32:
+                t = t.to(torch.float32)
+            batch[i, :n_i, :] = t
+            mask_padding[i, :n_i] = False
+            return batch, mask_padding
 
     #Étape 1 : calcul du nombre total d'éléments
     lengths = np.array([len(x[0]) for x in input], dtype=np.int32)
@@ -56,4 +74,4 @@ def check(input, grid_size, device, list_values=None):
     
     indices = torch.stack([batch_indices, x_indices, y_indices], dim=0)
     shape = (len(input), grid_size, grid_size)
-    return torch.sparse_coo_tensor(indices, values, shape, device=device)
+    return torch.sparse_coo_tensor(indices, values, shape, device=device), None

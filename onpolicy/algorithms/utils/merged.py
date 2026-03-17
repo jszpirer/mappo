@@ -1,12 +1,118 @@
 import torch.nn as nn
 import spconv.pytorch as spconv
-from torch import cat, chunk, inf, sparse_coo_tensor, float32, empty, device, zeros
+from torch import cat, sparse_coo_tensor, float32, zeros, bool
 from .util import init
 from math import ceil
 
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
+    
+class EgoAttentionMechanism(nn.Module):
+    def __init__(self, output_dim, d_model=64, nhead=4):
+        super().__init__()
+        self.d_model = d_model
+        self.output_dim = output_dim
+        
+        # Encoder for the positions
+        self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
+                                                nn.ReLU(),
+                                                nn.Linear(self.d_model, self.d_model))
+
+        # Attention module
+        self.lnkv = nn.LayerNorm(self.d_model)
+        self.lnq = nn.LayerNorm(self.d_model)
+        self.attn = nn.MultiheadAttention(
+                    embed_dim = self.d_model,
+                    num_heads = nhead,
+                    dropout = 0.0,
+                    batch_first = True
+                )
+        self.lnout = nn.LayerNorm(self.d_model)
+
+        # Linear layer to get the right ouput size
+        self.fc = nn.Linear(self.d_model, out_features=output_dim)
+        self.tanh = nn.Tanh()
+
+    def forward(self, list_x, list_mask=None):
+        for i, x in enumerate(list_x) :      
+            B, N, _ = x.shape
+
+            # Encoding of the positions of the neighbors
+            neigh = self.neighbor_encoder(x)
+            
+            # Encoding of the ego value (0,0)
+            ego_in = zeros(B, 1, 2, device=x.device)
+            ego = self.neighbor_encoder(ego_in)
+
+            # Concatenation of the encoded values
+            tokens = cat([ego, neigh], dim=1)
+
+            # Ego is never masked
+            if list_mask[i] is not None:
+                full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask[i].device), list_mask[i]], dim=1)
+            
+            # Attention blocks
+            xkv = self.lnkv(tokens)
+            xq = self.lnq(ego)
+            attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=full_mask)
+            xq = xq + attn_out
+            xq = self.lnout(xq)
+
+            # Linear layer to get the right size for the output
+            x = xq.squeeze(1)
+            return self.tanh(self.fc(x))
+
+
+class SelfAttentionMechanism(nn.Module):
+    def __init__(self, output_dim, num_agents, d_model=64, nhead=4, attn_layers=1):
+        super().__init__()
+        self.d_model = d_model
+        self.output_dim = output_dim
+        
+        # Encoder for the positions
+        self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
+                                                nn.ReLU(),
+                                                nn.Linear(self.d_model, self.d_model))
+
+        # Attention module
+        self.attn_blocks = nn.ModuleList()
+        for _ in range(attn_layers):
+            block = nn.ModuleDict({
+                "ln1": nn.LayerNorm(self.d_model),
+                "attn": nn.MultiheadAttention(
+                    embed_dim = self.d_model,
+                    num_heads = nhead,
+                    dropout = 0.0,
+                    batch_first = True
+                ),
+                "ln2": nn.LayerNorm(self.d_model)
+            })
+            self.attn_blocks.append(block)
+        
+        # Linear layer to get the right ouput size
+        self.tanh = nn.Tanh()
+        self.fc = nn.Linear(self.d_model * num_agents, out_features=output_dim)
+        
+    def forward(self, list_x, list_mask=None):
+        # x should be a numpy array, mask too if not None
+        for i, x in enumerate(list_x) :      
+            B, N, _ = x.shape
+
+            # Encoding of the positions of the neighbors
+            positions = self.neighbor_encoder(x)
+            
+            # Attention blocks
+            x = positions
+            for blk in self.attn_blocks:
+                xn = blk["ln1"](x)
+                attn_out, _ = blk["attn"](xn, xn, xn)
+                x = x + attn_out
+                x = blk["ln2"](x)
+            
+            # Linear layer 
+            x = x.view(x.size(0), -1)
+            return self.tanh(self.fc(x))
 
 class SimplSparseSpreadCNN(nn.Module):
     def __init__(self, obs_shape, output_size, use_orthogonal, use_ReLU, kernel_size=2, stride=1, input_channels=1, output_channels=1, padding_size=0):
@@ -41,13 +147,6 @@ class SimplSparseSpreadCNN(nn.Module):
             ndim = len(x.size()) 
             dummy_index = zeros((1, ndim), dtype=indices.dtype, device=indices.device)
             sparse = spconv.SparseConvTensor(dummy_features, dummy_index, x.size()[1:], batch_size=x.size()[0])
-            #device_for_tensor = device("cuda:0")
-            #i = empty((2, 0), device=device_for_tensor)
-            #v = empty((0,), device=device_for_tensor)
-            #flat = sparse_coo_tensor(i, v, size=(x.size()[0], self.size*self.size), device=device_for_tensor)
-            #x = zeros((x.size()[0], self.output_size), device=device_for_tensor)
-            #print("No landmark")
-        #else:
         output = self.net(sparse)
 
         coords = output.indices
@@ -62,7 +161,6 @@ class SimplSparseSpreadCNN(nn.Module):
 
         # Pass the flattened outputs through the linear layers
         x = self.fc(flat)
-        #print("Something detected")
 
         return self.tanh(x)
 
@@ -97,6 +195,8 @@ class MergedModel(nn.Module):
        self.omniscient_critic = mlp_args.omniscient_critic
        self.dim_actor = mlp_args.dim_actor
        self.critic = critic
+       self.attention_actor = mlp_args.attention_actor
+       self.attention_critic = mlp_args.attention_critic
        padding_actor=mlp_args.padding
        if self.critic and self.omniscient_critic:
            self.dim_actor = 3
@@ -124,16 +224,23 @@ class MergedModel(nn.Module):
                 self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
                 input_size = 17
             else:
-                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                if self.attention_critic:
+                    self.attn = SelfAttentionMechanism(flattened_size, mlp_args.num_agents)
+                else:
+                    self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                 self.dim_actor = 1
                 input_size -= 2
        else:
+            # Actor case
             if "rvr" in self.experiment_name:
                 self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3, padding_size=padding_actor)
                 self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
                 input_size = 19
             else:
-                self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                if self.attention_actor:
+                    self.attn = EgoAttentionMechanism(flattened_size)
+                else:
+                    self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
               
        self.nb_additional_data = mlp_args.nb_additional_data
        
@@ -145,7 +252,7 @@ class MergedModel(nn.Module):
 
        self.mlp = MLPLayer(input_size, mlp_args.hidden_size, mlp_args.layer_N, mlp_args.use_orthogonal, mlp_args.use_ReLU)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
         for i in range(len(x)//(self.dim_actor)):
@@ -157,12 +264,17 @@ class MergedModel(nn.Module):
                     #x_inter = x1
                 elif "coverage" in self.experiment_name:
                     if self.critic and self.omniscient_critic:
-                        x1 = self.cnn1([x[0]])
+                        if self.attention_critic:
+                            x1 = self.attn([x[0]])
+                        else:
+                            x1 = self.cnn1([x[0]])
                         x_inter = x1
                     else:
                         velocity = x[i*self.dim_actor + 0]
-
-                        x1 = self.cnn1([x[i*self.dim_actor + 1]])
+                        if self.attention_actor:
+                            x1 = self.attn([x[i*self.dim_actor + 1]], list_mask=mask)
+                        else:
+                            x1 = self.cnn1([x[i*self.dim_actor + 1]])
                         x_inter = cat((velocity, x1), dim=1)
                 else:
                     velocity = x[i*self.dim_actor + 0]
