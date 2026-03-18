@@ -19,9 +19,10 @@ class EgoAttentionMechanism(nn.Module):
         self.null_token = nn.Parameter(zeros(1, 1, d_model))
         
         # Encoder for the positions
-        self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
-                                                nn.ReLU(),
-                                                nn.Linear(self.d_model, self.d_model))
+        #self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
+                                                #nn.ReLU(),
+                                                #nn.Linear(self.d_model, self.d_model))
+        self.neighbor_encoder = nn.Linear(2, self.d_model)
 
         # Attention module
         self.lnkv = nn.LayerNorm(self.d_model)
@@ -50,12 +51,13 @@ class EgoAttentionMechanism(nn.Module):
             neigh = self.neighbor_encoder(x)
             
             # Encoding of the ego value (0,0)
-            # ego_in = zeros(B, 1, 2, device=x.device)
-            ego = self.ego_query.expand(B, 1, -1)
+            ego_in = zeros(B, 1, 2, device=x.device)
+            # ego = self.ego_query.expand(B, 1, -1)
+            ego = self.neighbor_encoder(ego_in)
 
             # Concatenation of the encoded values
-            null = self.null_token.expand(B, 1, -1)
-            tokens = cat([null, neigh], dim=1)
+            #null = self.null_token.expand(B, 1, -1)
+            tokens = cat([ego, neigh], dim=1)
 
             # Ego is never masked
             if list_mask[i] is not None:
@@ -68,7 +70,10 @@ class EgoAttentionMechanism(nn.Module):
             # New test because it is not working
             #xq = xq + attn_out
             #xq = xq + self.ffn(self.lnout(xq))
-            xq = self.lnout(xq + attn_out)
+            
+
+            #xq = self.lnout(xq + attn_out)
+            xq = self.lnout(attn_out)
 
             # Linear layer to get the right size for the output
             x = xq.squeeze(1)
@@ -260,7 +265,7 @@ class MergedModel(nn.Module):
                 input_size = 19
             else:
                 if self.attention_actor:
-                    self.attn = EgoAttentionMechanism(flattened_size)
+                    self.attn = EgoAttentionMechanism(flattened_size, d_model=32)
                 else:
                     self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
               
