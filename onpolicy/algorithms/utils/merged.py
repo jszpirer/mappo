@@ -1,6 +1,6 @@
 import torch.nn as nn
 import spconv.pytorch as spconv
-from torch import cat, sparse_coo_tensor, float32, zeros, bool
+from torch import cat, sparse_coo_tensor, float32, zeros, bool, randn
 from .util import init
 from math import ceil
 
@@ -13,6 +13,10 @@ class EgoAttentionMechanism(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.output_dim = output_dim
+
+        # Learned information that we are missing
+        self.ego_query = nn.Parameter(randn(1, 1, d_model) * 0.02)
+        self.null_token = nn.Parameter(zeros(1, 1, d_model))
         
         # Encoder for the positions
         self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
@@ -30,6 +34,10 @@ class EgoAttentionMechanism(nn.Module):
                 )
         self.lnout = nn.LayerNorm(self.d_model)
 
+        self.ffn = nn.Sequential(nn.Linear(d_model, 4 * d_model),
+                                 nn.ReLU(),
+                                 nn.Linear(4 * d_model, d_model))
+
         # Linear layer to get the right ouput size
         self.fc = nn.Linear(self.d_model, out_features=output_dim)
         self.tanh = nn.Tanh()
@@ -42,11 +50,12 @@ class EgoAttentionMechanism(nn.Module):
             neigh = self.neighbor_encoder(x)
             
             # Encoding of the ego value (0,0)
-            ego_in = zeros(B, 1, 2, device=x.device)
-            ego = self.neighbor_encoder(ego_in)
+            # ego_in = zeros(B, 1, 2, device=x.device)
+            ego = self.ego_query.expand(B, 1, -1)
 
             # Concatenation of the encoded values
-            tokens = cat([ego, neigh], dim=1)
+            null = self.null_token.expand(B, 1, -1)
+            tokens = cat([null, neigh], dim=1)
 
             # Ego is never masked
             if list_mask[i] is not None:
@@ -57,7 +66,7 @@ class EgoAttentionMechanism(nn.Module):
             xq = self.lnq(ego)
             attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=full_mask)
             xq = xq + attn_out
-            xq = self.lnout(xq)
+            xq = xq + self.ffn(self.lnout(xq))
 
             # Linear layer to get the right size for the output
             x = xq.squeeze(1)
@@ -89,6 +98,10 @@ class SelfAttentionMechanism(nn.Module):
                 "ln2": nn.LayerNorm(self.d_model)
             })
             self.attn_blocks.append(block)
+
+        self.ffn = nn.Sequential(nn.Linear(d_model, 4 * d_model),
+                                 nn.ReLU(),
+                                 nn.Linear(4 * d_model, d_model))
         
         # Linear layer to get the right ouput size
         self.tanh = nn.Tanh()
@@ -108,7 +121,7 @@ class SelfAttentionMechanism(nn.Module):
                 xn = blk["ln1"](x)
                 attn_out, _ = blk["attn"](xn, xn, xn)
                 x = x + attn_out
-                x = blk["ln2"](x)
+                x = x + self.ffn(blk["ln2"](x))
             
             # Linear layer 
             x = x.view(x.size(0), -1)
