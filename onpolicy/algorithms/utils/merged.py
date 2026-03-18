@@ -65,8 +65,10 @@ class EgoAttentionMechanism(nn.Module):
             xkv = self.lnkv(tokens)
             xq = self.lnq(ego)
             attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=full_mask)
-            xq = xq + attn_out
-            xq = xq + self.ffn(self.lnout(xq))
+            # New test because it is not working
+            #xq = xq + attn_out
+            #xq = xq + self.ffn(self.lnout(xq))
+            xq = self.lnout(xq + attn_out)
 
             # Linear layer to get the right size for the output
             x = xq.squeeze(1)
@@ -75,14 +77,16 @@ class EgoAttentionMechanism(nn.Module):
 
 class SelfAttentionMechanism(nn.Module):
     def __init__(self, output_dim, num_agents, d_model=64, nhead=4, attn_layers=1):
+        print("On utilise le self attention pour le critic")
         super().__init__()
         self.d_model = d_model
         self.output_dim = output_dim
         
         # Encoder for the positions
-        self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
-                                                nn.ReLU(),
-                                                nn.Linear(self.d_model, self.d_model))
+        #self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
+                                                #nn.ReLU(),
+                                                #nn.Linear(self.d_model, self.d_model))
+        self.neighbor_encoder = nn.Linear(2, self.d_model)
 
         # Attention module
         self.attn_blocks = nn.ModuleList()
@@ -105,7 +109,8 @@ class SelfAttentionMechanism(nn.Module):
         
         # Linear layer to get the right ouput size
         self.tanh = nn.Tanh()
-        self.fc = nn.Linear(self.d_model * num_agents, out_features=output_dim)
+        #self.fc = nn.Linear(self.d_model * num_agents, out_features=output_dim)
+        self.fc = nn.Linear(self.d_model, out_features=output_dim)
         
     def forward(self, list_x, list_mask=None):
         # x should be a numpy array, mask too if not None
@@ -120,11 +125,15 @@ class SelfAttentionMechanism(nn.Module):
             for blk in self.attn_blocks:
                 xn = blk["ln1"](x)
                 attn_out, _ = blk["attn"](xn, xn, xn)
-                x = x + attn_out
-                x = x + self.ffn(blk["ln2"](x))
+                # New test because it is not working
+                #x = x + attn_out
+                #x = x + self.ffn(blk["ln2"](x))
+                x = blk["ln2"](x + attn_out)
             
             # Linear layer 
-            x = x.view(x.size(0), -1)
+            # Ajout de mean pour respecter la structure d'un paper pour le critic
+            x = x.mean(dim=1)
+            #x = x.view(x.size(0), -1)
             return self.tanh(self.fc(x))
 
 class SimplSparseSpreadCNN(nn.Module):
@@ -238,7 +247,7 @@ class MergedModel(nn.Module):
                 input_size = 17
             else:
                 if self.attention_critic:
-                    self.attn = SelfAttentionMechanism(flattened_size, mlp_args.num_agents)
+                    self.attn = SelfAttentionMechanism(flattened_size, mlp_args.num_agents, d_model=32)
                 else:
                     self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                 self.dim_actor = 1
