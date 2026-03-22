@@ -80,7 +80,7 @@ class Scenario(BaseScenario):
             if other is agent:
                 continue
             distance = np.linalg.norm(other.state.p_pos - agent.state.p_pos)
-            if distance <= 8:
+            if distance <= 15:
                 dist = other.state.p_pos - agent.state.p_pos
                 if world.use_directions:
                     old_distance = dist

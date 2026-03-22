@@ -240,6 +240,8 @@ class MergedModel(nn.Module):
             #only the local case for now
             flattened_size -= num_landmarks_features
             if "local" in self.experiment_name:
+                if self.attention_actor:
+                    flattened_size -= 2
                 input_size = flattened_size + mlp_args.nb_additional_data
                 self.dim_actor = 2
             else:
@@ -258,14 +260,16 @@ class MergedModel(nn.Module):
                 self.dim_actor = 1
                 input_size -= 2
        else:
-            # Actor case
             if "rvr" in self.experiment_name:
                 self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3, padding_size=padding_actor)
                 self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
                 input_size = 19
             else:
                 if self.attention_actor:
-                    self.attn = EgoAttentionMechanism(flattened_size, d_model=32)
+                    if not self.critic:
+                        self.attn = EgoAttentionMechanism(flattened_size, d_model=32)
+                elif self.attention_critic:
+                    input_size -= 2
                 else:
                     self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
               
@@ -296,6 +300,14 @@ class MergedModel(nn.Module):
                         else:
                             x1 = self.cnn1([x[0]])
                         x_inter = x1
+                    elif self.critic and self.attention_actor:
+                        velocity = x[i*self.dim_actor + 0]
+                        positions = x[i*self.dim_actor + 1].reshape(x[i*self.dim_actor + 1].size(0), x[i*self.dim_actor + 1].size(1) * x[i*self.dim_actor + 1].size(2))
+                        x_inter = cat((velocity, positions), dim=1)
+                    elif self.attention_critic and not self.attention_actor:
+                        action = x[i*self.dim_actor + 0]
+                        positions = x[i*self.dim_actor + 1].reshape(x[i*self.dim_actor + 1].size(0), x[i*self.dim_actor + 1].size(1) * x[i*self.dim_actor + 1].size(2))
+                        x_inter = cat((action, positions), dim=1)
                     else:
                         velocity = x[i*self.dim_actor + 0]
                         if self.attention_actor:

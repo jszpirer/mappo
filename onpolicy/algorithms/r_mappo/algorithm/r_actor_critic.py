@@ -43,6 +43,7 @@ class R_Actor(nn.Module):
         self._use_recurrent_policy = args.use_recurrent_policy
         self._recurrent_N = args.recurrent_N
         self.padding = args.attention_actor
+        self.attention_critic = args.attention_critic
         self.tpdv = dict(dtype=torch.float32, device=device)
         self.device = device
 
@@ -74,12 +75,16 @@ class R_Actor(nn.Module):
         """
         list_obs = []
         list_padding = []
+        if not self.padding and self.attention_critic:
+            original_actor = True
+        else:
+            original_actor = False
         for i in range(len(obs[0])):
             if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
                 indice_grid = int(obs[0][i][0])
                 obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
-                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding)
+                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
                 list_padding.append(padding_to_add)
@@ -114,12 +119,16 @@ class R_Actor(nn.Module):
         """
         list_obs = []
         list_padding = []
+        if not self.padding and self.attention_critic:
+            original_actor = True
+        else:
+            original_actor = False
         for i in range(len(obs[0])):
             if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
                 indice_grid = int(obs[0][i][0])
                 obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
-                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding)
+                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
                 list_padding.append(padding_to_add)
@@ -179,6 +188,7 @@ class R_Critic(nn.Module):
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][self._use_orthogonal]
         self.omniscient_critic = args.omniscient_critic
         self.padding = args.attention_critic
+        self.padding_actor = args.attention_actor
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
         base = MergedModel
@@ -214,7 +224,8 @@ class R_Critic(nn.Module):
                 indice_grid = int(cent_obs[0][i][0])
                 cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
             else:
-                cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding)
+                cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding, nonomniscient=not self.omniscient_critic)
+            
             list_cent_obs.append(cent_obs_to_add)
         rnn_states, _ = check(rnn_states, -1, self.device)
         if self.omniscient_critic:

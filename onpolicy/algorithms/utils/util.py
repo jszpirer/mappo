@@ -26,7 +26,7 @@ def init(module, weight_init, bias_init, gain=1):
 def get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
-def check(input, grid_size, device, list_values=None, padding=False):
+def check(input, grid_size, device, list_values=None, padding=False, nonomniscient=False):
     if isinstance(input, torch.Tensor):
         return input.to(device), None
     if isinstance(input, np.ndarray):
@@ -35,6 +35,13 @@ def check(input, grid_size, device, list_values=None, padding=False):
         return torch.from_numpy(input).to(device), None
     if len(input[0].shape) == 1:
         return torch.tensor(np.array(input, dtype=np.float32)).to(device), None
+    if nonomniscient:
+        batch_size = len(input)
+        batch = torch.full((batch_size, input[0].shape[0], input[0].shape[1]), fill_value=0, dtype=torch.float32, device=device)
+        
+        for i, arr in enumerate(input):
+            batch[i, :, :] = torch.as_tensor(arr, device=device)
+        return batch, None
     if padding:
         # In this case, attention mechanism and padding needed to do batch operations
         batch_size = len(input)
