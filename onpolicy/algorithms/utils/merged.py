@@ -19,10 +19,11 @@ class EgoAttentionMechanism(nn.Module):
         self.null_token = nn.Parameter(zeros(1, 1, d_model))
         
         # Encoder for the positions
-        #self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
-                                                #nn.ReLU(),
-                                                #nn.Linear(self.d_model, self.d_model))
-        self.neighbor_encoder = nn.Linear(2, self.d_model)
+        self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
+                                                nn.Tanh(),
+                                                nn.Linear(self.d_model, self.d_model),
+                                                nn.Tanh())
+        #self.neighbor_encoder = nn.Linear(2, self.d_model)
 
         # Attention module
         self.lnkv = nn.LayerNorm(self.d_model)
@@ -51,29 +52,33 @@ class EgoAttentionMechanism(nn.Module):
             neigh = self.neighbor_encoder(x)
             
             # Encoding of the ego value (0,0)
-            ego_in = zeros(B, 1, 2, device=x.device)
-            # ego = self.ego_query.expand(B, 1, -1)
-            ego = self.neighbor_encoder(ego_in)
+            # ego_in = zeros(B, 1, 2, device=x.device)
+            ego = self.ego_query.expand(B, 1, -1)
+            # ego = self.neighbor_encoder(ego_in)
 
             # Concatenation of the encoded values
             #null = self.null_token.expand(B, 1, -1)
-            tokens = cat([ego, neigh], dim=1)
+            #tokens = cat([ego, neigh], dim=1)
+            tokens = neigh
 
             # Ego is never masked
-            if list_mask[i] is not None:
-                full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask[i].device), list_mask[i]], dim=1)
+            #if list_mask[i] is not None:
+                #full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask[i].device), list_mask[i]], dim=1)
             
             # Attention blocks
-            xkv = self.lnkv(tokens)
-            xq = self.lnq(ego)
-            attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=full_mask)
+            #xkv = self.lnkv(tokens)
+            #xq = self.lnq(ego)
+            xkv = tokens
+            xq = ego
+            attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=list_mask[i])
             # New test because it is not working
             #xq = xq + attn_out
             #xq = xq + self.ffn(self.lnout(xq))
             
 
             #xq = self.lnout(xq + attn_out)
-            xq = self.lnout(attn_out)
+            #xq = self.lnout(attn_out)
+            xq = attn_out
 
             # Linear layer to get the right size for the output
             x = xq.squeeze(1)
@@ -256,7 +261,10 @@ class MergedModel(nn.Module):
                 if self.attention_critic:
                     self.attn = SelfAttentionMechanism(flattened_size, mlp_args.num_agents, d_model=32)
                 else:
-                    self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                    if not self.attention_actor:
+                        self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                    else :
+                        input_size += 2
                 self.dim_actor = 1
                 input_size -= 2
        else:
@@ -297,6 +305,8 @@ class MergedModel(nn.Module):
                     if self.critic and self.omniscient_critic:
                         if self.attention_critic:
                             x1 = self.attn([x[0]])
+                        elif self.attention_actor:
+                            x1 = x[0].reshape(x[0].size(0), x[0].size(1) * x[0].size(2))
                         else:
                             x1 = self.cnn1([x[0]])
                         x_inter = x1

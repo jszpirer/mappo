@@ -54,6 +54,10 @@ def parse_args(args, parser):
                         default=False, help="Whether to use directions for the particles or not")
     parser.add_argument("--discrete_action", action='store_false',
                         default=True, help="Whether to use discrete actions or not")
+    parser.add_argument("--attention_actor", action='store_true',
+                        default=False, help="Wether to use an attention mechanism for the actor network")
+    parser.add_argument("--attention_critic", action='store_true',
+                        default=False, help="Wether to use an attention mechanism for the critic network")
     all_args = parser.parse_known_args(args)[0]
 
     return all_args

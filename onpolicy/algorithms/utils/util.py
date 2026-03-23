@@ -59,7 +59,7 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
                 t = t.to(torch.float32)
             batch[i, :n_i, :] = t
             mask_padding[i, :n_i] = False
-            return batch, mask_padding
+        return batch, mask_padding
 
     #Étape 1 : calcul du nombre total d'éléments
     lengths = np.array([len(x[0]) for x in input], dtype=np.int32)

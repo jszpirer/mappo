@@ -85,6 +85,7 @@ class R_Actor(nn.Module):
                 obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
                 obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
+            
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
                 list_padding.append(padding_to_add)
@@ -218,13 +219,17 @@ class R_Critic(nn.Module):
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
         list_cent_obs = []
+        if self.padding_actor and not self.padding:
+            test_actor_only = True
+        else:
+            test_actor_only = False
         for i in range(len(cent_obs[0])):
             if self.omniscient_critic and len(cent_obs[0][i].shape) == 1 and i != 3 and not self.padding:
                 # In this case the observation is values for a grid, to know which one: check the first element of the observation
                 indice_grid = int(cent_obs[0][i][0])
                 cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
             else:
-                cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding, nonomniscient=not self.omniscient_critic)
+                cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding, nonomniscient=test_actor_only)
             
             list_cent_obs.append(cent_obs_to_add)
         rnn_states, _ = check(rnn_states, -1, self.device)
