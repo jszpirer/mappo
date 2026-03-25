@@ -48,17 +48,15 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
         n_max = max(a.shape[0] for a in input)
 
         # Pre allocation for the final batch tensors
-        batch = torch.full((batch_size, n_max, 2), fill_value=0, dtype=torch.float32, device=device)
+        batch_np = np.zeros((batch_size, n_max, 2), dtype=np.float32)
         mask_padding = torch.ones((batch_size, n_max), dtype=torch.bool, device=device)
 
         # Filling in the tensors
         for i, arr in enumerate(input):
             n_i = arr.shape[0]
-            t = torch.as_tensor(arr, device=device)
-            if t.dtype != torch.float32:
-                t = t.to(torch.float32)
-            batch[i, :n_i, :] = t
+            batch_np[i, :n_i, :] = arr
             mask_padding[i, :n_i] = False
+        batch = torch.from_numpy(batch_np).to(device)
         return batch, mask_padding
 
     #Étape 1 : calcul du nombre total d'éléments

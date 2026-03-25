@@ -58,19 +58,19 @@ class EgoAttentionMechanism(nn.Module):
 
             # Concatenation of the encoded values
             #null = self.null_token.expand(B, 1, -1)
-            #tokens = cat([ego, neigh], dim=1)
-            tokens = neigh
+            tokens = cat([ego, neigh], dim=1)
+            #tokens = neigh
 
             # Ego is never masked
-            #if list_mask[i] is not None:
-                #full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask[i].device), list_mask[i]], dim=1)
+            if list_mask[i] is not None:
+                full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask[i].device), list_mask[i]], dim=1)
             
             # Attention blocks
             #xkv = self.lnkv(tokens)
             #xq = self.lnq(ego)
             xkv = tokens
             xq = ego
-            attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=list_mask[i])
+            attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=full_mask)
             # New test because it is not working
             #xq = xq + attn_out
             #xq = xq + self.ffn(self.lnout(xq))

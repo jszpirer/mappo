@@ -96,11 +96,11 @@ class Scenario(BaseScenario):
             other_pos = other_pos[:-j, :]
         
         observations = np.empty([2], dtype=object)
-        #if agent.action.u is None:
-            #observations[:] = [np.zeros(2), other_pos]
-        #else:
-            #observations[:] = [agent.action.u, other_pos]
-        observations[:] = [agent.state.p_vel, other_pos]
+        if agent.action.u is None:
+            observations[:] = [np.zeros(2), other_pos]
+        else:
+            observations[:] = [agent.action.u, other_pos]
+        #observations[:] = [agent.state.p_vel, other_pos]
         return observations
     
     def critic_observation(self, world):
