@@ -249,6 +249,7 @@ class MergedModel(nn.Module):
                     flattened_size -= 2
                 input_size = flattened_size + mlp_args.nb_additional_data
                 self.dim_actor = 2
+                input_size = 22
             else:
                 input_size = flattened_size + 2*mlp_args.nb_additional_data
                 self.dim_actor = 3
@@ -264,7 +265,7 @@ class MergedModel(nn.Module):
                     if not self.attention_actor:
                         self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                     else :
-                        input_size += 2
+                        input_size = 22
                 self.dim_actor = 1
                 input_size -= 2
        else:
@@ -275,7 +276,7 @@ class MergedModel(nn.Module):
             else:
                 if self.attention_actor:
                     if not self.critic:
-                        self.attn = EgoAttentionMechanism(flattened_size, d_model=32)
+                        self.attn = EgoAttentionMechanism(20, d_model=mlp_args.d_model)
                 elif self.attention_critic:
                     input_size -= 2
                 else:
