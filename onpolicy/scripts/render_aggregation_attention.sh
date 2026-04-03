@@ -1,14 +1,14 @@
 #!/bin/sh
 env="MPE"
-scenario="simple_coverage_aggregation_cnn_sparse_localj_attention"
+scenario="simple_coverage_aggregation_cnn_sparse_localj_attention_local"
 num_landmarks=0
-num_agents=5
+num_agents=10
 grid_resolution=77
 stride=2
 kernel=7
 nb_additional_data=2
 algo="rmappo"
-exp="local_coverage_aggregation_attention_rangedirection_actoronly_scienceDirect_egoquery"
+exp="local_coverage_aggregation_attention_actoronly"
 seed_max=1
 
 echo "env is ${env}"
@@ -18,7 +18,7 @@ do
     CUDA_VISIBLE_DEVICES=0 python render/render_mpe.py --save_gifs --env_name ${env} --algorithm_name ${algo} \
     --experiment_name ${exp} --scenario_name ${scenario} --num_agents ${num_agents} --num_landmarks ${num_landmarks} --seed ${random_seed} \
     --n_training_threads 1 --n_rollout_threads 1 --use_render --episode_length 125 --render_episodes 1 \
-    --model_dir "/home/thales/jszpirer/sugar/mappo/onpolicy/scripts/results/MPE/simple_coverage_aggregation_cnn_sparse_localj_attention/rmappo/local_coverage_aggregation_attention_rangedirection_actoronly_scienceDirect/wandb/run-20260322_215616-vq6xeg63/files" \
-    --use_wandb False --nb_additional_data ${nb_additional_data} \
+    --model_dir "/home/thales/jszpirer/sugar/mappo/onpolicy/scripts/results/aggregation10agentsattention_seed1/files" \
+    --use_wandb False --nb_additional_data ${nb_additional_data} --use_directions \
     --stride ${stride} --kernel ${kernel} --omniscient_critic --attention_actor
 done
