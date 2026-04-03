@@ -23,7 +23,6 @@ class EgoAttentionMechanism(nn.Module):
                                                 nn.Tanh(),
                                                 nn.Linear(self.d_model, self.d_model),
                                                 nn.Tanh())
-        #self.neighbor_encoder = nn.Linear(2, self.d_model)
 
         # Attention module
         self.lnkv = nn.LayerNorm(self.d_model)
@@ -34,11 +33,6 @@ class EgoAttentionMechanism(nn.Module):
                     dropout = 0.0,
                     batch_first = True
                 )
-        self.lnout = nn.LayerNorm(self.d_model)
-
-        self.ffn = nn.Sequential(nn.Linear(d_model, 4 * d_model),
-                                 nn.ReLU(),
-                                 nn.Linear(4 * d_model, d_model))
 
         # Linear layer to get the right ouput size
         self.fc = nn.Linear(self.d_model, out_features=output_dim)
@@ -52,32 +46,20 @@ class EgoAttentionMechanism(nn.Module):
             neigh = self.neighbor_encoder(x)
             
             # Encoding of the ego value (0,0)
-            # ego_in = zeros(B, 1, 2, device=x.device)
             ego = self.ego_query.expand(B, 1, -1)
-            # ego = self.neighbor_encoder(ego_in)
 
             # Concatenation of the encoded values
-            #null = self.null_token.expand(B, 1, -1)
             tokens = cat([ego, neigh], dim=1)
-            #tokens = neigh
 
             # Ego is never masked
             if list_mask[i] is not None:
                 full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask[i].device), list_mask[i]], dim=1)
             
             # Attention blocks
-            #xkv = self.lnkv(tokens)
-            #xq = self.lnq(ego)
             xkv = tokens
             xq = ego
             attn_out, _ = self.attn(xq, xkv, xkv, key_padding_mask=full_mask)
-            # New test because it is not working
-            #xq = xq + attn_out
-            #xq = xq + self.ffn(self.lnout(xq))
-            
 
-            #xq = self.lnout(xq + attn_out)
-            #xq = self.lnout(attn_out)
             xq = attn_out
 
             # Linear layer to get the right size for the output
@@ -86,40 +68,28 @@ class EgoAttentionMechanism(nn.Module):
 
 
 class SelfAttentionMechanism(nn.Module):
-    def __init__(self, output_dim, num_agents, d_model=64, nhead=4, attn_layers=1):
-        print("On utilise le self attention pour le critic")
+    def __init__(self, output_dim, d_model=64, nhead=4, attn_layers=1):
         super().__init__()
         self.d_model = d_model
         self.output_dim = output_dim
         
         # Encoder for the positions
-        #self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
-                                                #nn.ReLU(),
-                                                #nn.Linear(self.d_model, self.d_model))
-        self.neighbor_encoder = nn.Linear(2, self.d_model)
+        self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
+                                                nn.Tanh(),
+                                                nn.Linear(self.d_model, self.d_model),
+                                                nn.Tanh())
 
         # Attention module
-        self.attn_blocks = nn.ModuleList()
-        for _ in range(attn_layers):
-            block = nn.ModuleDict({
-                "ln1": nn.LayerNorm(self.d_model),
-                "attn": nn.MultiheadAttention(
+        self.ln = nn.LayerNorm(self.d_model)
+        self.attn = nn.MultiheadAttention(
                     embed_dim = self.d_model,
                     num_heads = nhead,
                     dropout = 0.0,
                     batch_first = True
-                ),
-                "ln2": nn.LayerNorm(self.d_model)
-            })
-            self.attn_blocks.append(block)
-
-        self.ffn = nn.Sequential(nn.Linear(d_model, 4 * d_model),
-                                 nn.ReLU(),
-                                 nn.Linear(4 * d_model, d_model))
+                )
         
         # Linear layer to get the right ouput size
         self.tanh = nn.Tanh()
-        #self.fc = nn.Linear(self.d_model * num_agents, out_features=output_dim)
         self.fc = nn.Linear(self.d_model, out_features=output_dim)
         
     def forward(self, list_x, list_mask=None):
@@ -132,18 +102,10 @@ class SelfAttentionMechanism(nn.Module):
             
             # Attention blocks
             x = positions
-            for blk in self.attn_blocks:
-                xn = blk["ln1"](x)
-                attn_out, _ = blk["attn"](xn, xn, xn)
-                # New test because it is not working
-                #x = x + attn_out
-                #x = x + self.ffn(blk["ln2"](x))
-                x = blk["ln2"](x + attn_out)
+            attn_out, _ = self.attn(x, x, x)
             
-            # Linear layer 
-            # Ajout de mean pour respecter la structure d'un paper pour le critic
-            x = x.mean(dim=1)
-            #x = x.view(x.size(0), -1)
+            # Linear layer
+            x = attn_out.mean(dim=1)
             return self.tanh(self.fc(x))
 
 class SimplSparseSpreadCNN(nn.Module):
@@ -260,12 +222,13 @@ class MergedModel(nn.Module):
                 input_size = 17
             else:
                 if self.attention_critic:
-                    self.attn = SelfAttentionMechanism(flattened_size, mlp_args.num_agents, d_model=32)
+                    self.attn = SelfAttentionMechanism(mlp_args.num_agents*2, d_model=mlp_args.d_model)
+                    input_size = mlp_args.num_agents*2 + 2
                 else:
                     if not self.attention_actor:
                         self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                     else :
-                        input_size = 22
+                        input_size = mlp_args.num_agents*2 + 2
                 self.dim_actor = 1
                 input_size -= 2
        else:
