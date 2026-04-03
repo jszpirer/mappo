@@ -69,6 +69,7 @@ def parse_args(args, parser):
     parser.add_argument("--curriculum_start", type=int, default=0)
     parser.add_argument("--obs_range", type=float, default=3)
     parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--d_model", type=int, default=32)
     parser.add_argument("--use_directions", action='store_true',
                         default=False, help="Whether to use directions for the particles or not")
     parser.add_argument("--discrete_action", action='store_false',
