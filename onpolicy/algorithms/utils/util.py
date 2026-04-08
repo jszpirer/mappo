@@ -3,6 +3,7 @@ import numpy as np
 from numba import njit
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pad_sequence
 
 @njit
 def fill_indices(input_x, input_y, batch_indices, x_indices, y_indices):
@@ -33,7 +34,7 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
         if input.dtype == object:
             return torch.from_numpy(np.array(input, dtype=np.float32)).to(device), None
         return torch.from_numpy(input).to(device), None
-    if len(input[0].shape) == 1:
+    if len(input[0].shape) == 1 and input[0].size > 0:
         return torch.tensor(np.array(input, dtype=np.float32)).to(device), None
     if nonomniscient:
         batch_size = len(input)
@@ -45,18 +46,32 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
     if padding:
         # In this case, attention mechanism and padding needed to do batch operations
         batch_size = len(input)
-        n_max = max(a.shape[0] for a in input)
+        #n_max = max(a.shape[0] for a in input)
+        lengths = np.fromiter((arr.shape[0] for arr in input),
+                           dtype=np.int32, count=batch_size)
+        n_max = lengths.max(initial=0)
 
         # Pre allocation for the final batch tensors
         batch_np = np.zeros((batch_size, n_max, 2), dtype=np.float32)
-        mask_padding = torch.ones((batch_size, n_max), dtype=torch.bool, device=device)
+        """mask_padding = torch.ones((batch_size, n_max), dtype=torch.bool, device=device)
 
         # Filling in the tensors
         for i, arr in enumerate(input):
             n_i = arr.shape[0]
-            batch_np[i, :n_i, :] = arr
-            mask_padding[i, :n_i] = False
+            if n_i > 0: 
+                batch_np[i, :n_i, :] = arr
+                mask_padding[i, :n_i] = False
+        batch = torch.from_numpy(batch_np).to(device)"""
+        mask_np = np.ones((batch_size, n_max), dtype=np.bool_)
+ 
+        for i in range(batch_size):
+            n_i = lengths[i]
+            if n_i:
+                batch_np[i, :n_i] = input[i]
+                mask_np[i, :n_i] = False
+    
         batch = torch.from_numpy(batch_np).to(device)
+        mask_padding = torch.from_numpy(mask_np).to(device)
         return batch, mask_padding
 
     #Étape 1 : calcul du nombre total d'éléments

@@ -35,6 +35,7 @@ def parse_args(args, parser):
     parser.add_argument('--scenario_name', type=str,
                         default='simple_spread', help="Which scenario to run on")
     parser.add_argument("--num_landmarks", type=int, default=3)
+    parser.add_argument("--num_obstacles", type=int, default=0)
     parser.add_argument('--num_agents', type=int,
                         default=2, help="number of players")
     parser.add_argument("--grid_resolution", type=int, default=0)
@@ -50,6 +51,7 @@ def parse_args(args, parser):
     parser.add_argument("--curriculum_start", type=int, default=0)
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--output_entities", type=int, default=6)
+    parser.add_argument("--d_model", type=int, default=32)
     parser.add_argument("--use_directions", action='store_true',
                         default=False, help="Whether to use directions for the particles or not")
     parser.add_argument("--discrete_action", action='store_false',

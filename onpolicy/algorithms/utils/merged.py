@@ -52,8 +52,8 @@ class EgoAttentionMechanism(nn.Module):
             tokens = cat([ego, neigh], dim=1)
 
             # Ego is never masked
-            if list_mask[i] is not None:
-                full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask[i].device), list_mask[i]], dim=1)
+            if list_mask is not None:
+                full_mask = cat([zeros(B, 1, dtype=bool, device=list_mask.device), list_mask], dim=1)
             
             # Attention blocks
             xkv = tokens
@@ -194,7 +194,7 @@ class MergedModel(nn.Module):
        padding_actor=mlp_args.padding
        if self.critic and self.omniscient_critic:
            self.dim_actor = 3
-
+       self.num_obstacles = mlp_args.num_obstacles
        if mlp_args.num_landmarks == 0:
            num_landmarks_features = 6
        else:
@@ -212,6 +212,10 @@ class MergedModel(nn.Module):
                 input_size = flattened_size + mlp_args.nb_additional_data
                 self.dim_actor = 2
                 input_size = 22
+                print(self.num_obstacles)
+                if self.num_obstacles != 0:
+                    self.dim_actor = 3
+                    input_size = 30
             else:
                 input_size = flattened_size + 2*mlp_args.nb_additional_data
                 self.dim_actor = 3
@@ -224,12 +228,15 @@ class MergedModel(nn.Module):
                 if self.attention_critic:
                     self.attn = SelfAttentionMechanism(mlp_args.num_agents*2, d_model=mlp_args.d_model)
                     input_size = mlp_args.num_agents*2 + 2
+                    if self.num_obstacles != 0:
+                        self.attn_obs = SelfAttentionMechanism(mlp_args.num_obstacles*2, d_model=mlp_args.d_model)
+                        input_size += mlp_args.num_obstacles*2
                 else:
                     if not self.attention_actor:
                         self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                     else :
                         input_size = mlp_args.num_agents*2 + 2
-                self.dim_actor = 1
+                self.dim_actor = 2
                 input_size -= 2
        else:
             if "rvr" in self.experiment_name:
@@ -240,6 +247,8 @@ class MergedModel(nn.Module):
                 if self.attention_actor:
                     if not self.critic:
                         self.attn = EgoAttentionMechanism(20, d_model=mlp_args.d_model)
+                        if self.num_obstacles != 0:
+                            self.attn_obs = EgoAttentionMechanism(8, d_model=mlp_args.d_model)
                 elif self.attention_critic:
                     input_size -= 2
                 else:
@@ -269,11 +278,17 @@ class MergedModel(nn.Module):
                     if self.critic and self.omniscient_critic:
                         if self.attention_critic:
                             x1 = self.attn([x[0]])
+                            if self.num_obstacles != 0:
+                                x2 = self.attn_obs([x[1]])
+                                x_inter = cat((x1, x2), dim=1)
+                            else:
+                                x_inter = x1
                         elif self.attention_actor:
                             x1 = x[0].reshape(x[0].size(0), x[0].size(1) * x[0].size(2))
+                            x_inter = x1
                         else:
                             x1 = self.cnn1([x[0]])
-                        x_inter = x1
+                            x_inter = x1
                     elif self.critic and self.attention_actor:
                         velocity = x[i*self.dim_actor + 0]
                         positions = x[i*self.dim_actor + 1].reshape(x[i*self.dim_actor + 1].size(0), x[i*self.dim_actor + 1].size(1) * x[i*self.dim_actor + 1].size(2))
@@ -285,10 +300,15 @@ class MergedModel(nn.Module):
                     else:
                         velocity = x[i*self.dim_actor + 0]
                         if self.attention_actor:
-                            x1 = self.attn([x[i*self.dim_actor + 1]], list_mask=mask)
+                            x1 = self.attn([x[i*self.dim_actor + 1]], list_mask=mask[i*self.dim_actor + 0])
+                            if self.num_obstacles != 0:
+                                x2 = self.attn_obs([x[i*self.dim_actor + 2]], list_mask=mask[i*self.dim_actor + 1])
+                                x_inter = cat((velocity, x1, x2), dim=1)
+                            else:
+                                x_inter = cat((velocity, x1), dim=1)
                         else:
                             x1 = self.cnn1([x[i*self.dim_actor + 1]])
-                        x_inter = cat((velocity, x1), dim=1)
+                            x_inter = cat((velocity, x1), dim=1)
                 else:
                     velocity = x[i*self.dim_actor + 0]
 

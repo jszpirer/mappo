@@ -117,6 +117,7 @@ class World(object):
         self.agents = []
         self.landmarks = []
         self.walls = []
+        self.obstacles = []
         self.limit = 100
         # communication channel dimensionality
         self.dim_c = 0
@@ -140,6 +141,7 @@ class World(object):
         self.world_step = 0
         self.num_agents = 0
         self.num_landmarks = 0
+        self.num_obstacles = 0
         self.one_reward = False
         self.grid_resolution = 0
         self.grid_resolution_critic = 0
@@ -152,7 +154,7 @@ class World(object):
     # return all entities in the world
     @property
     def entities(self):
-        return self.agents + self.landmarks
+        return self.agents + self.landmarks + self.obstacles
 
     # return all agents controllable by external policies
     @property
