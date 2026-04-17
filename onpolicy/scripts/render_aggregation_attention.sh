@@ -18,7 +18,7 @@ do
     CUDA_VISIBLE_DEVICES=0 python render/render_mpe.py --save_gifs --env_name ${env} --algorithm_name ${algo} \
     --experiment_name ${exp} --scenario_name ${scenario} --num_agents ${num_agents} --num_landmarks ${num_landmarks} --seed ${random_seed} \
     --n_training_threads 1 --n_rollout_threads 1 --use_render --episode_length 125 --render_episodes 1 \
-    --model_dir "/home/thales/jszpirer/sugar/mappo/onpolicy/scripts/results/aggregation10agentsattention_seed1/files" \
+    --model_dir "/home/thales/jszpirer/sugar/mappo/onpolicy/scripts/results/aggregation10agentsattentionlocal_seed1/files" \
     --use_wandb False --nb_additional_data ${nb_additional_data} --use_directions \
     --stride ${stride} --kernel ${kernel} --omniscient_critic --attention_actor
 done

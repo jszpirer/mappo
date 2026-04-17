@@ -33,6 +33,12 @@ class EgoAttentionMechanism(nn.Module):
                     dropout = 0.0,
                     batch_first = True
                 )
+        
+        self.lnout = nn.LayerNorm(self.d_model)
+ 
+        self.ffn = nn.Sequential(nn.Linear(d_model, 4 * d_model),
+                                 nn.ReLU(),
+                                 nn.Linear(4 * d_model, d_model))
 
         # Linear layer to get the right ouput size
         self.fc = nn.Linear(self.d_model, out_features=output_dim)
@@ -212,7 +218,6 @@ class MergedModel(nn.Module):
                 input_size = flattened_size + mlp_args.nb_additional_data
                 self.dim_actor = 2
                 input_size = 22
-                print(self.num_obstacles)
                 if self.num_obstacles != 0:
                     self.dim_actor = 3
                     input_size = 30
@@ -225,18 +230,20 @@ class MergedModel(nn.Module):
                 self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
                 input_size = 17
             else:
+                self.dim_actor = 0
                 if self.attention_critic:
                     self.attn = SelfAttentionMechanism(mlp_args.num_agents*2, d_model=mlp_args.d_model)
                     input_size = mlp_args.num_agents*2 + 2
                     if self.num_obstacles != 0:
                         self.attn_obs = SelfAttentionMechanism(mlp_args.num_obstacles*2, d_model=mlp_args.d_model)
                         input_size += mlp_args.num_obstacles*2
+                        self.dim_actor += 1
                 else:
                     if not self.attention_actor:
                         self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                     else :
                         input_size = mlp_args.num_agents*2 + 2
-                self.dim_actor = 2
+                self.dim_actor += 1
                 input_size -= 2
        else:
             if "rvr" in self.experiment_name:
