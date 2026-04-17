@@ -40,6 +40,12 @@ class EgoAttentionMechanism(nn.Module):
                                  nn.ReLU(),
                                  nn.Linear(4 * d_model, d_model))
 
+        self.lnout = nn.LayerNorm(self.d_model)
+ 
+        self.ffn = nn.Sequential(nn.Linear(d_model, 4 * d_model),
+                                 nn.ReLU(),
+                                 nn.Linear(4 * d_model, d_model))
+        
         # Linear layer to get the right ouput size
         self.fc = nn.Linear(self.d_model, out_features=output_dim)
         self.tanh = nn.Tanh()
@@ -291,6 +297,7 @@ class MergedModel(nn.Module):
                             else:
                                 x_inter = x1
                         elif self.attention_actor:
+                            print("It should go there")
                             x1 = x[0].reshape(x[0].size(0), x[0].size(1) * x[0].size(2))
                             x_inter = x1
                         else:
