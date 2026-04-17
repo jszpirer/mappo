@@ -34,6 +34,12 @@ class EgoAttentionMechanism(nn.Module):
                     batch_first = True
                 )
 
+        self.lnout = nn.LayerNorm(self.d_model)
+ 
+        self.ffn = nn.Sequential(nn.Linear(d_model, 4 * d_model),
+                                 nn.ReLU(),
+                                 nn.Linear(4 * d_model, d_model))
+        
         # Linear layer to get the right ouput size
         self.fc = nn.Linear(self.d_model, out_features=output_dim)
         self.tanh = nn.Tanh()
@@ -225,18 +231,20 @@ class MergedModel(nn.Module):
                 self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution_critic, mlp_args.grid_resolution_critic), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
                 input_size = 17
             else:
+                self.dim_actor = 0
                 if self.attention_critic:
                     self.attn = SelfAttentionMechanism(mlp_args.num_agents*2, d_model=mlp_args.d_model)
                     input_size = mlp_args.num_agents*2 + 2
                     if self.num_obstacles != 0:
                         self.attn_obs = SelfAttentionMechanism(mlp_args.num_obstacles*2, d_model=mlp_args.d_model)
                         input_size += mlp_args.num_obstacles*2
+                        self.dim_actor += 1
                 else:
                     if not self.attention_actor:
                         self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
                     else :
                         input_size = mlp_args.num_agents*2 + 2
-                self.dim_actor = 2
+                self.dim_actor += 1
                 input_size -= 2
        else:
             if "rvr" in self.experiment_name:
@@ -284,6 +292,7 @@ class MergedModel(nn.Module):
                             else:
                                 x_inter = x1
                         elif self.attention_actor:
+                            print("It should go there")
                             x1 = x[0].reshape(x[0].size(0), x[0].size(1) * x[0].size(2))
                             x_inter = x1
                         else:
