@@ -219,18 +219,23 @@ class R_Critic(nn.Module):
         :return rnn_states: (torch.Tensor) updated RNN hidden states.
         """
         list_cent_obs = []
+        list_padding = []
         if self.padding_actor and not self.padding:
             test_actor_only = True
         else:
             test_actor_only = False
         for i in range(len(cent_obs[0])):
+            padding_to_add = None
             if self.omniscient_critic and len(cent_obs[0][i].shape) == 1 and i != 3 and not self.padding:
                 # In this case the observation is values for a grid, to know which one: check the first element of the observation
                 indice_grid = int(cent_obs[0][i][0])
                 cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
             else:
+                if self.padding:
+                    cent_obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self.device, padding=self.padding, nonomniscient=test_actor_only)
                 cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding, nonomniscient=test_actor_only)
-            
+            if padding_to_add is not None:
+                list_padding.append(padding_to_add)
             list_cent_obs.append(cent_obs_to_add)
         rnn_states, _ = check(rnn_states, -1, self.device)
         if self.omniscient_critic:
@@ -238,7 +243,7 @@ class R_Critic(nn.Module):
         else:
             masks, _ = check(masks, -1, self.device)
 
-        critic_features = self.base(list_cent_obs)
+        critic_features = self.base(list_cent_obs, list_padding)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             rnn_states = rnn_states

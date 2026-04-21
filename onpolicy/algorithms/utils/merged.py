@@ -251,13 +251,12 @@ class MergedModel(nn.Module):
                 self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 5, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
                 input_size = 19
             else:
-                if self.attention_actor:
-                    if not self.critic:
-                        self.attn = EgoAttentionMechanism(20, d_model=mlp_args.d_model)
-                        if self.num_obstacles != 0:
-                            self.attn_obs = EgoAttentionMechanism(8, d_model=mlp_args.d_model)
+                if self.attention_actor and not self.critic:
+                    self.attn = EgoAttentionMechanism(20, d_model=mlp_args.d_model)
+                    if self.num_obstacles != 0:
+                        self.attn_obs = EgoAttentionMechanism(8, d_model=mlp_args.d_model)
                 elif self.attention_critic:
-                    input_size -= 2
+                    self.attn = EgoAttentionMechanism(flattened_size, d_model=mlp_args.d_model)
                 else:
                     self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
               
@@ -291,16 +290,11 @@ class MergedModel(nn.Module):
                             else:
                                 x_inter = x1
                         elif self.attention_actor:
-                            print("It should go there")
                             x1 = x[0].reshape(x[0].size(0), x[0].size(1) * x[0].size(2))
                             x_inter = x1
                         else:
                             x1 = self.cnn1([x[0]])
                             x_inter = x1
-                    elif self.critic and self.attention_actor:
-                        velocity = x[i*self.dim_actor + 0]
-                        positions = x[i*self.dim_actor + 1].reshape(x[i*self.dim_actor + 1].size(0), x[i*self.dim_actor + 1].size(1) * x[i*self.dim_actor + 1].size(2))
-                        x_inter = cat((velocity, positions), dim=1)
                     elif self.attention_critic and not self.attention_actor:
                         action = x[i*self.dim_actor + 0]
                         positions = x[i*self.dim_actor + 1].reshape(x[i*self.dim_actor + 1].size(0), x[i*self.dim_actor + 1].size(1) * x[i*self.dim_actor + 1].size(2))
@@ -319,22 +313,20 @@ class MergedModel(nn.Module):
                             x_inter = cat((velocity, x1), dim=1)
                 else:
                     velocity = x[i*self.dim_actor + 0]
-
                     if "rvr" in self.experiment_name:
                         x1 = self.cnn1(x[1:4])
                         x2 = self.cnn2([x[4]])
                         x_inter = cat((velocity, x1, x2), dim=1)
-                        #x_inter = cat((velocity, x1), dim=1)
                     else:
                         x1 = self.cnn1([x[i*self.dim_actor + 1]])
                         x_inter = cat((velocity, x1), dim=1)
             else:
                 position = x[i*self.dim_actor + 0]
-
                 velocity = x[i*self.dim_actor + 1]
-
-                x1 = self.cnn1([x[i*self.dim_actor + 2]])
-
+                if self.attention_critic:
+                    x1 = self.attn([x[i*self.dim_actor + 2]], list_mask=mask[i])
+                else:
+                    x1 = self.cnn1([x[i*self.dim_actor + 2]])
                 x_inter = cat((velocity, position, x1), dim=1)
             x_inter_list.append(x_inter)
         # Concatenate the output of the CNN with position and velocity
