@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from onpolicy.algorithms.r_mappo.algorithm.r_actor_critic import R_Actor, R_Critic
 from onpolicy.utils.util import update_linear_schedule
 
@@ -36,6 +37,9 @@ class R_MAPPOPolicy:
                                                  eps=self.opti_eps,
                                                  weight_decay=self.weight_decay)
 
+        self.omniscient_critic = args.omniscient_critic
+        self.attention_critic = args.attention_critic
+
     def lr_decay(self, episode, episodes):
         """
         Decay the actor and critic learning rates.
@@ -68,8 +72,11 @@ class R_MAPPOPolicy:
                                                                  rnn_states_actor,
                                                                  masks,
                                                                  available_actions,
-                                                                 deterministic)
-        values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks)
+                                                                 deterministic, memory=self.attention_critic and not self.omniscient_critic)
+        if self.attention_critic and not self.omniscient_critic:
+            values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs, memory_padding=self.actor.list_padding)
+        else:
+            values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks)
         return values, actions, action_log_probs, rnn_states_actor, rnn_states_critic
 
     def get_values(self, cent_obs, rnn_states_critic, masks):
@@ -107,9 +114,11 @@ class R_MAPPOPolicy:
                                                                      action,
                                                                      masks,
                                                                      available_actions,
-                                                                     active_masks)
-
-        values, _ = self.critic(cent_obs, rnn_states_critic, masks)
+                                                                     active_masks, memory=self.attention_critic and not self.omniscient_critic)
+        if self.attention_critic and not self.omniscient_critic:
+            values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs, memory_padding=self.actor.list_padding)
+        else:
+            values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks)
         return values, action_log_probs, dist_entropy
 
     def act(self, obs, rnn_states_actor, masks, available_actions=None, deterministic=False):

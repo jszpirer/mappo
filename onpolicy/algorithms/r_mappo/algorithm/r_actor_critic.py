@@ -58,8 +58,10 @@ class R_Actor(nn.Module):
 
         self.to(device)
         self.algo = args.algorithm_name
+        self.list_obs = []
+        self.list_padding = []
 
-    def forward(self, obs, rnn_states, masks, available_actions=None, deterministic=False):
+    def forward(self, obs, rnn_states, masks, available_actions=None, deterministic=False, memory=False):
         """
         Compute actions from the given inputs.
         :param obs: (np.ndarray / torch.Tensor) observation inputs into network.
@@ -95,6 +97,9 @@ class R_Actor(nn.Module):
             available_actions, _ = check(available_actions, self.grid_size, self.device)
 
         actor_features = self.base(list_obs, mask=list_padding)
+        if memory:
+            self.list_obs = list_obs
+            self.list_padding = list_padding
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             rnn_states = rnn_states
@@ -104,7 +109,7 @@ class R_Actor(nn.Module):
         actions, action_log_probs = self.act(actor_features, available_actions, deterministic)
         return actions, action_log_probs, rnn_states
 
-    def evaluate_actions(self, obs, rnn_states, action, masks, available_actions=None, active_masks=None):
+    def evaluate_actions(self, obs, rnn_states, action, masks, available_actions=None, active_masks=None, memory=False):
         """
         Compute log probability and entropy of given actions.
         :param obs: (torch.Tensor) observation inputs into network.
@@ -141,8 +146,10 @@ class R_Actor(nn.Module):
 
         if active_masks is not None:
             active_masks, _ = check(active_masks, self.grid_size, self.device)
-
         actor_features = self.base(list_obs, mask=list_padding)
+        if memory:
+            self.list_obs = list_obs
+            self.list_padding = list_padding
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
             actor_features, rnn_states = self.rnn(actor_features, rnn_states, masks)
@@ -190,6 +197,7 @@ class R_Critic(nn.Module):
         self.omniscient_critic = args.omniscient_critic
         self.padding = args.attention_critic
         self.padding_actor = args.attention_actor
+        self.nb_agents = args.num_agents
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
         base = MergedModel
@@ -208,7 +216,7 @@ class R_Critic(nn.Module):
 
         self.to(device)
 
-    def forward(self, cent_obs, rnn_states, masks):
+    def forward(self, cent_obs, rnn_states, masks, memory=None, memory_padding=None):
         """
         Compute actions from the given inputs.
         :param cent_obs: (np.ndarray / torch.Tensor) observation inputs into network.
@@ -220,29 +228,32 @@ class R_Critic(nn.Module):
         """
         list_cent_obs = []
         list_padding = []
-        if self.padding_actor and not self.padding:
-            test_actor_only = True
+        if memory is not None:
+            list_cent_obs = memory * self.nb_agents
+            list_padding = memory_padding * self.nb_agents
         else:
-            test_actor_only = False
-        for i in range(len(cent_obs[0])):
-            padding_to_add = None
-            if self.omniscient_critic and len(cent_obs[0][i].shape) == 1 and i != 3 and not self.padding:
-                # In this case the observation is values for a grid, to know which one: check the first element of the observation
-                indice_grid = int(cent_obs[0][i][0])
-                cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
+            if self.padding_actor and not self.padding:
+                test_actor_only = True
             else:
-                if self.padding:
-                    cent_obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self.device, padding=self.padding, nonomniscient=test_actor_only)
-                cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding, nonomniscient=test_actor_only)
-            if padding_to_add is not None:
-                list_padding.append(padding_to_add)
-            list_cent_obs.append(cent_obs_to_add)
+                test_actor_only = False
+            for i in range(len(cent_obs[0])):
+                padding_to_add = None
+                if self.omniscient_critic and len(cent_obs[0][i].shape) == 1 and i != 3 and not self.padding:
+                    # In this case the observation is values for a grid, to know which one: check the first element of the observation
+                    indice_grid = int(cent_obs[0][i][0])
+                    cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
+                else:
+                    if self.padding:
+                        cent_obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self.device, padding=self.padding, nonomniscient=test_actor_only)
+                    cent_obs_to_add, _ = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, padding=self.padding, nonomniscient=test_actor_only)
+                if padding_to_add is not None:
+                    list_padding.append(padding_to_add)
+                list_cent_obs.append(cent_obs_to_add)
         rnn_states, _ = check(rnn_states, -1, self.device)
         if self.omniscient_critic:
             masks, _ = check(masks[:rnn_states.size()[0]], -1, self.device)
         else:
             masks, _ = check(masks, -1, self.device)
-
         critic_features = self.base(list_cent_obs, list_padding)
 
         if self._use_naive_recurrent_policy or self._use_recurrent_policy:
