@@ -217,7 +217,7 @@ class MergedModel(nn.Module):
                     flattened_size -= 2
                 input_size = flattened_size + mlp_args.nb_additional_data
                 self.dim_actor = 2
-                input_size = 22
+                input_size = 12
                 if self.num_obstacles != 0:
                     self.dim_actor = 3
                     input_size = 30

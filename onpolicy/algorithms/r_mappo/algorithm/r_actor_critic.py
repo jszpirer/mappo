@@ -230,7 +230,8 @@ class R_Critic(nn.Module):
         list_padding = []
         if memory is not None:
             list_cent_obs = memory * self.nb_agents
-            list_padding = memory_padding * self.nb_agents
+            if memory_padding is not None:
+                list_padding = memory_padding * self.nb_agents
         else:
             if self.padding_actor and not self.padding:
                 test_actor_only = True

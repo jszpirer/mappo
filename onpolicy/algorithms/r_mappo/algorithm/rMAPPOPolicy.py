@@ -72,9 +72,12 @@ class R_MAPPOPolicy:
                                                                  rnn_states_actor,
                                                                  masks,
                                                                  available_actions,
-                                                                 deterministic, memory=self.attention_critic and not self.omniscient_critic)
-        if self.attention_critic and not self.omniscient_critic:
-            values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs, memory_padding=self.actor.list_padding)
+                                                                 deterministic, memory=not self.omniscient_critic)
+        if not self.omniscient_critic:
+            if self.attention_critic:
+                values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs, memory_padding=self.actor.list_padding)
+            else:
+                values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs)
         else:
             values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks)
         return values, actions, action_log_probs, rnn_states_actor, rnn_states_critic
@@ -114,9 +117,12 @@ class R_MAPPOPolicy:
                                                                      action,
                                                                      masks,
                                                                      available_actions,
-                                                                     active_masks, memory=self.attention_critic and not self.omniscient_critic)
-        if self.attention_critic and not self.omniscient_critic:
-            values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs, memory_padding=self.actor.list_padding)
+                                                                     active_masks, memory=not self.omniscient_critic)
+        if not self.omniscient_critic:
+            if self.attention_critic:
+                values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs, memory_padding=self.actor.list_padding)
+            else:
+                values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks, memory=self.actor.list_obs)
         else:
             values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks)
         return values, action_log_probs, dist_entropy
