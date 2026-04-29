@@ -79,6 +79,8 @@ def parse_args(args, parser):
                         default=False, help="Wether to use an attention mechanism for the actor network")
     parser.add_argument("--attention_critic", action='store_true',
                         default=False, help="Wether to use an attention mechanism for the critic network")
+    parser.add_argument("--velocities_critic", action='store_true',
+                        default=False, help="Wether to use the velocities of the agents as more information to describe them")
 
     all_args = parser.parse_known_args(args)[0]
 

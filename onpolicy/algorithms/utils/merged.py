@@ -74,13 +74,13 @@ class EgoAttentionMechanism(nn.Module):
 
 
 class SelfAttentionMechanism(nn.Module):
-    def __init__(self, output_dim, d_model=64, nhead=4, attn_layers=1):
+    def __init__(self, output_dim, d_model=64, nhead=4, input_dim=2):
         super().__init__()
         self.d_model = d_model
         self.output_dim = output_dim
         
         # Encoder for the positions
-        self.neighbor_encoder = nn.Sequential(nn.Linear(2, self.d_model),
+        self.neighbor_encoder = nn.Sequential(nn.Linear(input_dim, self.d_model),
                                                 nn.Tanh(),
                                                 nn.Linear(self.d_model, self.d_model),
                                                 nn.Tanh())
@@ -198,6 +198,7 @@ class MergedModel(nn.Module):
        self.attention_actor = mlp_args.attention_actor
        self.attention_critic = mlp_args.attention_critic
        padding_actor=mlp_args.padding
+       velocities_critic = mlp_args.velocities_critic
        if self.critic and self.omniscient_critic:
            self.dim_actor = 3
        self.num_obstacles = mlp_args.num_obstacles
@@ -232,7 +233,10 @@ class MergedModel(nn.Module):
             else:
                 self.dim_actor = 0
                 if self.attention_critic:
-                    self.attn = SelfAttentionMechanism(mlp_args.num_agents*2, d_model=mlp_args.d_model)
+                    if velocities_critic:
+                        self.attn = SelfAttentionMechanism(mlp_args.num_agents*2, d_model=mlp_args.d_model, input_dim=4)
+                    else:
+                        self.attn = SelfAttentionMechanism(mlp_args.num_agents*2, d_model=mlp_args.d_model)
                     input_size = mlp_args.num_agents*2 + 2
                     if self.num_obstacles != 0:
                         self.attn_obs = SelfAttentionMechanism(mlp_args.num_obstacles*2, d_model=mlp_args.d_model)
@@ -273,6 +277,8 @@ class MergedModel(nn.Module):
     def forward(self, x, mask=None):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
+        print("Dans forward")
+        print(len(x))
         for i in range(len(x)//(self.dim_actor)):
             if "local" in self.experiment_name:
                 if self.critic and self.omniscient_critic and "rvr" in self.experiment_name:

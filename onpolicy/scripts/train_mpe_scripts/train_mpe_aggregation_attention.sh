@@ -6,7 +6,7 @@ num_agents=5
 nb_additional_data=2
 noise=0
 algo="rmappo" #"mappo" "ippo"
-exp="local_coverage_aggregation_attention_actor_critic_bigrange"
+exp="local_coverage_aggregation_attention_actor_critic_bigrange_velocities"
 seed_max=5
 project="epuck_aggregation_5agents"
 
@@ -20,5 +20,5 @@ do
     --n_training_threads 1 --n_rollout_threads 128 --num_mini_batch 1 --episode_length 125 --num_env_steps 50000000 \
     --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-5 --critic_lr 7e-4 --user_name "jeanne-szpirer-universit-libre-de-bruxelles" --project_name ${project} \
     --nb_additional_data ${nb_additional_data} --wheel_noise ${noise} --attention_actor \
-    --save_interval 1000000 --omniscient_critic --use_directions 
+    --save_interval 1000000 --omniscient_critic --velocities_critic --attention_critic
 done

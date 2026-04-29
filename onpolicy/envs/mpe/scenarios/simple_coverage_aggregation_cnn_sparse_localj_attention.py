@@ -17,6 +17,7 @@ class Scenario(BaseScenario):
         world.omniscient_critic = args.omniscient_critic
         world.use_directions = args.use_directions
         world.sensivity = 5.0
+        self.velocities_critic = args.velocities_critic
         # add agents
         world.agents = [Agent() for i in range(world.num_agents)]
         for i, agent in enumerate(world.agents):
@@ -104,10 +105,20 @@ class Scenario(BaseScenario):
         return observations
     
     def critic_observation(self, world):
-        agents_pos = np.zeros((world.num_agents, 2))
-        for i, a in enumerate(world.agents):
-            agents_pos[i][0] = a.state.p_pos[0]
-            agents_pos[i][1] = a.state.p_pos[1]
-        observations = np.empty([1], dtype=object)
-        observations[:] = [agents_pos]
+        if not self.velocities_critic:
+            agents_pos = np.zeros((world.num_agents, 2))
+            for i, a in enumerate(world.agents):
+                agents_pos[i][0] = a.state.p_pos[0]
+                agents_pos[i][1] = a.state.p_pos[1]
+            observations = np.empty([1], dtype=object)
+            observations[:] = [agents_pos]
+        else:
+            agents = np.zeros((world.num_agents, 4))
+            for i, a in enumerate(world.agents):
+                agents[i][0] = a.state.p_pos[0]
+                agents[i][1] = a.state.p_pos[1]
+                agents[i][2] = a.state.p_vel[0]
+                agents[i][3] = a.state.p_vel[1]
+            observations = np.empty([1], dtype=object)
+            observations[:] = [agents]
         return observations
