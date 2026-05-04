@@ -183,9 +183,15 @@ class MPERunner(Runner):
         # replay buffer
         if self.use_centralized_V:
             if self.omniscient_critic:
-                share_obs = obs[:, 0].reshape(-1,1)
-                share_obs = np.stack([np.stack(sublist, axis=0) for sublist in share_obs], axis=0).squeeze(1)
-                share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
+                if len(obs[:, 0].shape) == 1:
+                    # Attention case
+                    share_obs = obs[:, 0].reshape(-1,1)
+                    share_obs = np.stack([np.stack(sublist, axis=0) for sublist in share_obs], axis=0).squeeze(1)
+                    share_obs = np.expand_dims(share_obs, 1).repeat(self.num_agents, axis=1)
+                else:
+                    # CNN case
+                    share_obs = obs[:, 0]
+                    share_obs = np.repeat(share_obs[:, None, :], self.num_agents, axis=1)
                 obs = obs[:, 1:]
                 obs = np.stack([np.stack(sublist, axis=0) for sublist in obs], axis=0)
             else:

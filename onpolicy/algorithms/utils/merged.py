@@ -244,7 +244,9 @@ class MergedModel(nn.Module):
                         self.dim_actor += 1
                 else:
                     if not self.attention_actor:
-                        self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                        self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
+                        self.dim_actor = 2
+                        input_size = flattened_size + 2
                     else :
                         input_size = mlp_args.num_agents*2 + 2
                 self.dim_actor += 1
@@ -277,8 +279,6 @@ class MergedModel(nn.Module):
     def forward(self, x, mask=None):
         # Séparer le tenseur en trois parties autant de fois que nécessaire
         x_inter_list = []
-        print("Dans forward")
-        print(len(x))
         for i in range(len(x)//(self.dim_actor)):
             if "local" in self.experiment_name:
                 if self.critic and self.omniscient_critic and "rvr" in self.experiment_name:
@@ -327,13 +327,16 @@ class MergedModel(nn.Module):
                         x1 = self.cnn1([x[i*self.dim_actor + 1]])
                         x_inter = cat((velocity, x1), dim=1)
             else:
-                position = x[i*self.dim_actor + 0]
-                velocity = x[i*self.dim_actor + 1]
-                if self.attention_critic:
-                    x1 = self.attn([x[i*self.dim_actor + 2]], list_mask=mask[i])
+                if self.critic and not self.attention_critic:
+                    x_inter = self.cnn1(x[:3])
                 else:
-                    x1 = self.cnn1([x[i*self.dim_actor + 2]])
-                x_inter = cat((velocity, position, x1), dim=1)
+                    position = x[i*self.dim_actor + 0]
+                    velocity = x[i*self.dim_actor + 1]
+                    if self.attention_critic:
+                        x1 = self.attn([x[i*self.dim_actor + 2]], list_mask=mask[i])
+                    else:
+                        x1 = self.cnn1([x[i*self.dim_actor + 2]])
+                    x_inter = cat((velocity, position, x1), dim=1)
             x_inter_list.append(x_inter)
         # Concatenate the output of the CNN with position and velocity
         x = cat(x_inter_list, dim=1)

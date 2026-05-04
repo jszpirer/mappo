@@ -82,11 +82,12 @@ class R_Actor(nn.Module):
         else:
             original_actor = False
         for i in range(len(obs[0])):
-            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
-                indice_grid = int(obs[0][i][0])
-                obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
-            else:
-                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
+            #if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
+                #print(i)
+                #indice_grid = int(obs[0][i][0])
+                #obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
+            #else:
+            obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
             
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
@@ -130,11 +131,11 @@ class R_Actor(nn.Module):
         else:
             original_actor = False
         for i in range(len(obs[0])):
-            if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
-                indice_grid = int(obs[0][i][0])
-                obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
-            else:
-                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
+            #if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
+                #indice_grid = int(obs[0][i][0])
+                #obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
+            #else:
+            obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
                 list_padding.append(padding_to_add)
