@@ -250,7 +250,7 @@ class R_Critic(nn.Module):
                     indice_grid = int(cent_obs[0][i][0])
                     cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
                 else:
-                    cent_obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self.device, padding=self.padding, nonomniscient=test_actor_only, nb_features=nb_features)
+                    cent_obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self.device, padding=self.padding, nonomniscient=test_actor_only, nb_features=nb_features-i*2)
                 if padding_to_add is not None:
                     list_padding.append(padding_to_add)
                 list_cent_obs.append(cent_obs_to_add)
