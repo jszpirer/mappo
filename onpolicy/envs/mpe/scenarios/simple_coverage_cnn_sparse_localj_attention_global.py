@@ -1,8 +1,7 @@
 import numpy as np
 from onpolicy.envs.mpe.core import World, Agent, Landmark
 from onpolicy.envs.mpe.scenario import BaseScenario
- 
- 
+
 class Scenario(BaseScenario):
     def make_world(self, args):
         world = World()
@@ -29,11 +28,10 @@ class Scenario(BaseScenario):
             agent.max_speed = 0.51
         self.reset_world(world)
         return world
- 
+
     def reset_world(self, world):
         # random properties for agents
         world.assign_agent_colors()
- 
         # set random initial states
         for agent in world.agents:
             agent.state.p_pos = np.random.uniform(-3.6, +3.6, world.dim_p)
@@ -43,7 +41,7 @@ class Scenario(BaseScenario):
                 agent.direction = np.random.uniform(0, 2 * np.pi, 1)
                 agent.direction = np.mod(agent.direction, 2 * np.pi)
                 agent.direction_init = agent.direction
- 
+    
     def benchmark_data(self, agent, world):
         rew = 0
         collisions = 0
@@ -55,13 +53,13 @@ class Scenario(BaseScenario):
                     rew -= 1
                     collisions += 1
         return (rew, collisions, min_dists, occupied_landmarks)
- 
+    
     def is_collision(self, agent1, agent2):
         delta_pos = agent1.state.p_pos - agent2.state.p_pos
         dist = np.sqrt(np.sum(np.square(delta_pos)))
         dist_min = agent1.size + agent2.size
         return True if dist < dist_min else False
- 
+    
     def reward(self, agent, world):
         # Agents are rewarded based on minimum agent distance to each landmark, penalized for collisions
         rew = 0
@@ -72,8 +70,7 @@ class Scenario(BaseScenario):
             dists.append(np.sqrt(np.sum(np.square(a.state.p_pos - agent.state.p_pos))))
         rew = min(dists)
         return rew
- 
- 
+    
     def observation(self, agent, world):
         other_pos = np.zeros((world.num_agents - 1, 2))
         i = 0
@@ -87,7 +84,7 @@ class Scenario(BaseScenario):
         observations = np.empty([3], dtype=object)
         observations[:] = [agent.state.p_vel, agent.state.p_pos, other_pos]
         return observations
- 
+    
     def critic_observation(self, world):
         if not self.velocities_critic:
             agents_pos = np.zeros((world.num_agents, 2))
@@ -106,3 +103,4 @@ class Scenario(BaseScenario):
             observations = np.empty([1], dtype=object)
             observations[:] = [agents]
         return observations
+
