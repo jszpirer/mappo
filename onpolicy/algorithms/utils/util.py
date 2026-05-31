@@ -85,7 +85,4 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
     
     indices = torch.stack([batch_indices, x_indices, y_indices], dim=0)
     shape = (len(input), grid_size, grid_size)
-    print(indices.shape)
-    print(values.shape)
-    print(shape)
     return torch.sparse_coo_tensor(indices, values, shape, device=device), None

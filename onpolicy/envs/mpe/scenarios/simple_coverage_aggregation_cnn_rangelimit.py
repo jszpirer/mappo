@@ -1,4 +1,5 @@
 import numpy as np
+from math import ceil
 from onpolicy.envs.mpe.core import World, Agent, Landmark
 from onpolicy.envs.mpe.scenario import BaseScenario
 
@@ -14,8 +15,8 @@ class Scenario(BaseScenario):
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.nb_additional_data = args.nb_additional_data
-        world.omniscient_critic = False
-        world.use_directions = False
+        world.omniscient_critic = args.omniscient_critic
+        world.use_directions = args.use_directions
         world.sensivity = 5.0
         # add agents
         world.agents = [Agent() for i in range(world.num_agents)]
@@ -38,6 +39,10 @@ class Scenario(BaseScenario):
             agent.state.p_pos = np.random.uniform(-3.6, +3.6, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
+            if world.use_directions:
+                agent.direction = np.random.uniform(0, 2 * np.pi, 1)
+                agent.direction = np.mod(agent.direction, 2 * np.pi)
+                agent.direction_init = agent.direction
 
     def benchmark_data(self, agent, world):
         rew = 0
@@ -69,8 +74,7 @@ class Scenario(BaseScenario):
         return rew
 
     def observation(self, agent, world):
-
-        other_pos = np.zeros((2, world.num_agents + 3 * 2)) # Adding the possibility that a robot can be against a wall
+        other_pos = np.zeros((2, world.num_agents-1))
         i = 0
         j = 0
         for other in world.agents:
@@ -78,6 +82,10 @@ class Scenario(BaseScenario):
                 continue
             if np.linalg.norm(other.state.p_pos - agent.state.p_pos) <= 3:
                 distance = other.state.p_pos - agent.state.p_pos
+                if world.use_directions:
+                    old_distance = distance
+                    distance[0] = np.cos(agent.direction)*old_distance[0] - np.sin(agent.direction)*old_distance[1]
+                    distance[1] = np.sin(agent.direction)*old_distance[0] + np.cos(agent.direction)*old_distance[1]
                 coef = world.grid_resolution/(world.limit*4)
                 scale = (world.grid_resolution//2) - 1
                 other_pos[0][i] = round(coef*distance[0]) + scale
@@ -85,28 +93,35 @@ class Scenario(BaseScenario):
                 i += 1
             else:
                 j += 1
-        
-        if agent.state.p_pos[0] >= 3.56:
-            other_pos[:, i:i+3] = [[39, 39, 39], [37, 38, 39]]
-            i += 3
-        elif agent.state.p_pos[0] <= -3.56:
-            other_pos[:, i:i+3] = [[37, 37, 37], [37, 38, 39]]
-            i += 3
-        else:
-            j += 3
-        if agent.state.p_pos[1] >= 3.56:
-            other_pos[:, i:i+3] = [[37, 38, 39], [37, 37, 37]]
-            i += 3
-        elif agent.state.p_pos[1] <= -3.56:
-            other_pos[:, i:i+3] = [[37, 38, 39], [39, 39, 39]]
-            i += 3
-        else:
-            j += 3
-        
         if j > 0:
             other_pos = other_pos[:, :-j]
+        
         observations = np.empty([2], dtype=object)
         observations[:] = [agent.state.p_vel, other_pos]
         return observations
+
+    def critic_observation(self, world):
+        # Critic's observations are the same not matter which robot is used
+        # For velocities, need to know in which liste the indices of the grid are
+        agents_vel_x = np.zeros((world.num_agents + 1))
+        agents_vel_x[0] = 2
+        agents_vel_y = np.zeros((world.num_agents + 1))
+        agents_vel_y[0] = 2
+        other_pos = np.zeros((2, world.num_agents))
+        i = 0
+        for other in world.agents:
+            agents_vel_x[i + 1] = other.state.p_vel[0]
+            agents_vel_y[i + 1] = other.state.p_vel[1]
+            distance = other.state.p_pos
+            coef = int(ceil(world.grid_resolution/2)/(world.limit*2))
+            scale = int((ceil(world.grid_resolution/2)//2)) - 1
+            other_pos[0][i] = round(coef*distance[0]) + scale
+            other_pos[1][i] = round(coef*distance[1]) + scale
+            i += 1
+
+        observations = np.empty([3], dtype=object)
+        observations[:] = [agents_vel_x, agents_vel_y, other_pos]
+        return observations
+
     
     
