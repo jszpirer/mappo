@@ -13,8 +13,6 @@ class Scenario(BaseScenario):
         world.limit = 3.75
         world.num_agents = args.num_agents
         world.num_obstacles = args.num_obstacles
-        print("Num obstacles")
-        print(world.num_obstacles)
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.nb_additional_data = args.nb_additional_data

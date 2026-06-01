@@ -266,7 +266,7 @@ class MergedModel(nn.Module):
                 input_size = 19
             else:
                 if self.attention_actor and not self.critic:
-                    self.attn = EgoAttentionMechanism(20, d_model=mlp_args.d_model)
+                    self.attn = EgoAttentionMechanism(10, d_model=mlp_args.d_model)
                     if self.num_obstacles != 0:
                         self.attn_obs = EgoAttentionMechanism(12, d_model=mlp_args.d_model)
                 elif self.attention_critic:

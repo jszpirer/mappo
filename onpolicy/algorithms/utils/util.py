@@ -27,7 +27,7 @@ def init(module, weight_init, bias_init, gain=1):
 def get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
-def check(input, grid_size, device, list_values=None, padding=False, nonomniscient=False, nb_features=2):
+def check(input, grid_size, device, list_values=None, padding=False, nonomniscient=False, nb_features=2, global_obs=False):
     if isinstance(input, torch.Tensor):
         return input.to(device), None
     if isinstance(input, np.ndarray):
@@ -46,20 +46,24 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
     if padding:
         # In this case, attention mechanism and padding needed to do batch operations
         batch_size = len(input)
-        #n_max = max(a.shape[0] for a in input)
-        lengths = np.fromiter((arr.shape[0] for arr in input),
-                           dtype=np.int32, count=batch_size)
-        n_max = lengths.max(initial=0)
+        if global_obs:
+            n = input[0].shape[0]
+            batch_np = np.stack(input, axis=0).astype(np.float32)
+            mask_np = np.ones((batch_size, n), dtype=np.bool_)
+        else:
+            lengths = np.fromiter((arr.shape[0] for arr in input),
+                            dtype=np.int32, count=batch_size)
+            n_max = lengths.max(initial=0)
 
-        # Pre allocation for the final batch tensors
-        batch_np = np.zeros((batch_size, n_max, nb_features), dtype=np.float32)
-        mask_np = np.ones((batch_size, n_max), dtype=np.bool_)
- 
-        for i in range(batch_size):
-            n_i = lengths[i]
-            if n_i:
-                batch_np[i, :n_i] = input[i]
-                mask_np[i, :n_i] = False
+            # Pre allocation for the final batch tensors
+            batch_np = np.zeros((batch_size, n_max, nb_features), dtype=np.float32)
+            mask_np = np.ones((batch_size, n_max), dtype=np.bool_)
+    
+            for i in range(batch_size):
+                n_i = lengths[i]
+                if n_i:
+                    batch_np[i, :n_i] = input[i]
+                    mask_np[i, :n_i] = False
     
         batch = torch.from_numpy(batch_np).to(device)
         mask_padding = torch.from_numpy(mask_np).to(device)

@@ -46,6 +46,8 @@ class R_Actor(nn.Module):
         self.attention_critic = args.attention_critic
         self.tpdv = dict(dtype=torch.float32, device=device)
         self.device = device
+        if "global" in args.experiment_name:
+            self.global_obs = True
 
         obs_shape = get_shape_from_obs_space(obs_space)
         base = MergedModel
@@ -87,7 +89,7 @@ class R_Actor(nn.Module):
                 #indice_grid = int(obs[0][i][0])
                 #obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             #else:
-            obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
+            obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor, global_obs=self.global_obs)
             
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
@@ -135,7 +137,7 @@ class R_Actor(nn.Module):
                 #indice_grid = int(obs[0][i][0])
                 #obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             #else:
-            obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor)
+            obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor, global_obs=self.global_obs)
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
                 list_padding.append(padding_to_add)
@@ -200,6 +202,8 @@ class R_Critic(nn.Module):
         self.padding_actor = args.attention_actor
         self.nb_agents = args.num_agents
         self.velocities_critic = args.velocities_critic
+        if "global" in args.experiment_name:
+            self.global_obs = True
 
         cent_obs_shape = get_shape_from_obs_space(cent_obs_space)
         base = MergedModel
@@ -250,7 +254,7 @@ class R_Critic(nn.Module):
                     indice_grid = int(cent_obs[0][i][0])
                     cent_obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in cent_obs], self.grid_size_critic, self. device, [sparse_tensor[i][1:] for sparse_tensor in cent_obs])
                 else:
-                    cent_obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self.device, padding=self.padding, nonomniscient=test_actor_only, nb_features=nb_features-i*2)
+                    cent_obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in cent_obs], self.grid_size_critic, self.device, padding=self.padding, nonomniscient=test_actor_only, nb_features=nb_features-i*2, global_obs=self.global_obs)
                 if padding_to_add is not None:
                     list_padding.append(padding_to_add)
                 list_cent_obs.append(cent_obs_to_add)
