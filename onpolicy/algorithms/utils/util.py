@@ -49,7 +49,8 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
         if global_obs:
             n = input[0].shape[0]
             batch_np = np.stack(input, axis=0).astype(np.float32)
-            mask_np = np.ones((batch_size, n), dtype=np.bool_)
+            #mask_np = np.ones((batch_size, n), dtype=np.bool_)
+            mask_padding = None
         else:
             lengths = np.fromiter((arr.shape[0] for arr in input),
                             dtype=np.int32, count=batch_size)
@@ -64,9 +65,8 @@ def check(input, grid_size, device, list_values=None, padding=False, nonomniscie
                 if n_i:
                     batch_np[i, :n_i] = input[i]
                     mask_np[i, :n_i] = False
-    
+            mask_padding = torch.from_numpy(mask_np).to(device)
         batch = torch.from_numpy(batch_np).to(device)
-        mask_padding = torch.from_numpy(mask_np).to(device)
         return batch, mask_padding
 
     #Étape 1 : calcul du nombre total d'éléments
