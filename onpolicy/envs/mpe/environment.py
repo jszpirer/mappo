@@ -17,6 +17,7 @@ class MultiAgentEnv(gym.Env):
 
     def __init__(self, world, reset_callback=None, reward_callback=None,
                  observation_callback=None, critic_observation_callback=None,
+                 fill_in_occupancy_callback=None,
                  info_callback=None,
                  done_callback=None, post_step_callback=None,
                  shared_viewer=True, discrete_action=True):
@@ -33,6 +34,7 @@ class MultiAgentEnv(gym.Env):
         self.reward_callback = reward_callback
         self.observation_callback = observation_callback
         self.critic_observation_callback = critic_observation_callback
+        self.fill_in_occupancy_callback = fill_in_occupancy_callback
         self.info_callback = info_callback
         self.done_callback = done_callback
 
@@ -164,6 +166,9 @@ class MultiAgentEnv(gym.Env):
             reward = np.sum(reward_n)
         if self.shared_reward:
             reward_n = [[reward]] * self.n
+        
+        if self.fill_in_occupancy_callback is not None:
+            self.fill_in_occupancy_callback(self.world)
 
         if self.post_step_callback is not None:
             self.post_step_callback(self.world)
@@ -302,6 +307,9 @@ class MultiAgentEnv(gym.Env):
     def _reset_render(self):
         self.render_geoms = None
         self.render_geoms_xform = None
+
+    def save_occupancy(self):
+        np.save("occupancy_grid.npy", self.world.occupancy_grid)
 
     def render(self, mode='human', close=False):
         if close:

@@ -46,7 +46,8 @@ class R_Actor(nn.Module):
         self.attention_critic = args.attention_critic
         self.tpdv = dict(dtype=torch.float32, device=device)
         self.device = device
-        if "global" in args.experiment_name:
+        self.global_obs = False
+        if "obs" in args.experiment_name and args.omniscient_critic:
             self.global_obs = True
 
         obs_shape = get_shape_from_obs_space(obs_space)

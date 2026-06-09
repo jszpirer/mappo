@@ -327,5 +327,7 @@ class MPERunner(Runner):
  
         if self.all_args.save_gifs:
             imageio.mimsave(str(self.gif_dir) + '/render.gif', all_frames, duration=self.all_args.ifi)
+        if self.all_args.heatmap:
+            envs.save_occupancy()
  
  

@@ -105,6 +105,9 @@ class ShareVecEnv(ABC):
         self.step_async(actions)
         return self.step_wait()
 
+    def save_occupancy(self):
+        self.save_occupancy_async()
+
     def render(self, mode='human'):
         imgs = self.get_images()
         bigimg = tile_images(imgs)
@@ -200,6 +203,10 @@ class GuardSubprocVecEnv(ShareVecEnv):
         ShareVecEnv.__init__(self, len(env_fns), observation_space,
                              share_observation_space, action_space)
 
+    def save_occupancy_async(self):
+        for remote in self.remotes:
+            remote.send(('save_occupancy', None))
+    
     def step_async(self, actions):
 
         for remote, action in zip(self.remotes, actions):
@@ -258,6 +265,10 @@ class SubprocVecEnv(ShareVecEnv):
         ShareVecEnv.__init__(self, len(env_fns), observation_space,
                              share_observation_space, action_space)
 
+    def save_occupancy_async(self):
+        for remote in self.remotes:
+            remote.send(('save_occupancy', None))
+    
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
             remote.send(('step', action))
@@ -376,6 +387,10 @@ class ShareSubprocVecEnv(ShareVecEnv):
         ShareVecEnv.__init__(self, len(env_fns), observation_space,
                              share_observation_space, action_space)
 
+    def save_occupancy_async(self):
+        for remote in self.remotes:
+            remote.send(('save_occupancy', None))
+    
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
             remote.send(('step', action))
@@ -682,6 +697,10 @@ class DummyVecEnv(ShareVecEnv):
             env_fns), env.observation_space, env.share_observation_space, env.action_space)
         self.actions = None
 
+    def save_occupancy_async(self):
+        for env in self.envs:
+            env.save_occupancy()
+    
     def step_async(self, actions):
         self.actions = actions
 

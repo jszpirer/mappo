@@ -150,6 +150,7 @@ class World(object):
         self.discrete_actions = True
         self.sensivity = 1.7
         self.use_directions = False
+        self.occupancy_grid = None
 
     # return all entities in the world
     @property

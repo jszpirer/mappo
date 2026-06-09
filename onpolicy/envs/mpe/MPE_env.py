@@ -26,8 +26,17 @@ def MPEEnv(args):
     world = scenario.make_world(args)
     # create multiagent environment
     if args.omniscient_critic:
-        env = MultiAgentEnv(world, scenario.reset_world,
-                        scenario.reward, scenario.observation, scenario.critic_observation, scenario.info)
+        if "render" in args.experiment_name:
+            print("Here")
+            print(args.experiment_name)
+            env = MultiAgentEnv(world, scenario.reset_world,
+                        scenario.reward, scenario.observation, scenario.critic_observation, scenario.fill_in_occupancy, scenario.info)
+        else:
+            print("Here")
+            print(args.experiment_name)
+            env = MultiAgentEnv(world, scenario.reset_world,
+                        scenario.reward, scenario.observation, scenario.critic_observation, info_callback=scenario.info, fill_in_occupancy_callback=None)
+
     else:
         env = MultiAgentEnv(world, scenario.reset_world,
                         scenario.reward, scenario.observation, scenario.info)
