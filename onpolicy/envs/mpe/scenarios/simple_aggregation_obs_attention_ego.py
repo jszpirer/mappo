@@ -4,7 +4,7 @@ from onpolicy.envs.mpe.scenario import BaseScenario
 import random
 from math import sin, cos, sqrt
 
-proximity_sensors = [0.261799, 0.785398, 1.5708, 2.61799, 3.66519, 4.71239, 5.49779, 6.02139]
+proximity_sensors = [-2.6179, -1.5708, -0.785398, -0.261799, 0.261799, 0.785398, 1.5708, 2.6179]
 
 class Scenario(BaseScenario):
     def make_world(self, args):
@@ -137,6 +137,19 @@ class Scenario(BaseScenario):
 
             return [p1, p2]
 
+    def intersection_droites(self, x1, y1, dx1, dy1, x2, y2, dx2, dy2):
+        D = dx1 * dy2 - dy1 * dx2
+    
+        if D == 0:
+            return None  # parallèles ou confondues
+    
+        t = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / D
+    
+        x = x1 + t * dx1
+        y = y1 + t * dy1
+    
+        return [x, y]
+
     def observation(self, agent, world):
         obs_pos = []
         other_pos = np.zeros((world.num_agents - 1, 2))
@@ -210,7 +223,46 @@ class Scenario(BaseScenario):
                     dist[0] = (np.cos(agent.direction)*old_distance[0] - np.sin(agent.direction)*old_distance[1])[0]
                     dist[1] = (np.sin(agent.direction)*old_distance[0] + np.cos(agent.direction)*old_distance[1])[0]
                 bearing = np.arctan2(dist[0], dist[1])
-                obs_pos.append([distance - 0.65, bearing])
+                prox = self.get_closest_indice(bearing)
+                for plus in range(prox, len(proximity_sensors)):
+                    new_bearing = proximity_sensors[plus]
+                    inter = self.intersection_droite_cercle(0, 0, sin(new_bearing), cos(new_bearing), dist[0], dist[1], 0.5)
+                    if len(inter) == 0:
+                        break
+                    elif len(inter) == 1:
+                        distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
+                        if distance <= 0.32:
+                            obs_pos.append([distance-0.15, new_bearing])
+                        else:
+                            break
+                    else:
+                        distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
+                        distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
+                        distance = min(distance_1, distance_2)
+                        if distance <= 0.32:
+                            obs_pos.append([distance-0.15, new_bearing])
+                        else:
+                            break
+                if prox > 0:
+                    for plus in range(prox - 1, -1, -1):
+                        new_bearing = proximity_sensors[plus]
+                        inter = self.intersection_droite_cercle(0, 0, sin(new_bearing), cos(new_bearing), dist[0], dist[1], 0.15)
+                        if len(inter) == 0:
+                            break
+                        elif len(inter) == 1:
+                            distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
+                            if distance <= 0.32:
+                                obs_pos.append([distance-0.15, new_bearing])
+                            else:
+                                break
+                        else:
+                            distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
+                            distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
+                            distance = min(distance_1, distance_2)
+                            if distance <= 0.32:
+                                obs_pos.append([distance-0.15, new_bearing])
+                            else:
+                                break
         if agent.state.p_pos[0] >= 3.63:
             distance = 4 - agent.state.p_pos[0]
             dist = [4 - agent.state.p_pos[0], 0]
@@ -219,7 +271,30 @@ class Scenario(BaseScenario):
                 dist[0] = (np.cos(agent.direction)*old_distance[0] - np.sin(agent.direction)*old_distance[1])[0]
                 dist[1] = (np.sin(agent.direction)*old_distance[0] + np.cos(agent.direction)*old_distance[1])[0]
             bearing = np.arctan2(dist[0], dist[1])
-            obs_pos.append([distance - 0.2, bearing])
+            prox = self.get_closest_indice(bearing)
+            for plus in range(prox, len(proximity_sensors)):
+                new_bearing = proximity_sensors[plus]
+                inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), 4, 0, 4, 1)
+                if inter is None:
+                    break
+                else:
+                    distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                    if distance <= 0.37:
+                        obs_pos.append([distance-0.2, new_bearing])
+                    else:
+                        break
+            if prox > 0:
+                for plus in range(prox - 1, -1, -1):
+                    new_bearing = proximity_sensors[plus]
+                    inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), 4, 0, 4, 1)
+                    if inter is None:
+                        break
+                    else:
+                        distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                        if distance <= 0.37:
+                            obs_pos.append([distance-0.2, new_bearing])
+                        else:
+                            break
         elif agent.state.p_pos[0] <= -3.63:
             distance = 4 + agent.state.p_pos[0]
             dist = [-4 - agent.state.p_pos[0], 0]
@@ -228,7 +303,30 @@ class Scenario(BaseScenario):
                 dist[0] = (np.cos(agent.direction)*old_distance[0] - np.sin(agent.direction)*old_distance[1])[0]
                 dist[1] = (np.sin(agent.direction)*old_distance[0] + np.cos(agent.direction)*old_distance[1])[0]
             bearing = np.arctan2(dist[0], dist[1])
-            obs_pos.append([distance - 0.2, bearing])
+            prox = self.get_closest_indice(bearing)
+            for plus in range(prox, len(proximity_sensors)):
+                new_bearing = proximity_sensors[plus]
+                inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), -4, 0, -4, 1)
+                if inter is None:
+                    break
+                else:
+                    distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                    if distance <= 0.37:
+                        obs_pos.append([distance-0.2, new_bearing])
+                    else:
+                        break
+            if prox > 0:
+                for plus in range(prox - 1, -1, -1):
+                    new_bearing = proximity_sensors[plus]
+                    inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), -4, 0, -4, 1)
+                    if inter is None:
+                        break
+                    else:
+                        distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                        if distance <= 0.37:
+                            obs_pos.append([distance-0.2, new_bearing])
+                        else:
+                            break
         if agent.state.p_pos[1] >= 3.63:
             distance = 4 - agent.state.p_pos[1]
             dist = [0, 4 - agent.state.p_pos[1]]
@@ -237,8 +335,31 @@ class Scenario(BaseScenario):
                 dist[0] = (np.cos(agent.direction)*old_distance[0] - np.sin(agent.direction)*old_distance[1])[0]
                 dist[1] = (np.sin(agent.direction)*old_distance[0] + np.cos(agent.direction)*old_distance[1])[0]
             bearing = np.arctan2(dist[0], dist[1])
-            obs_pos.apennd([distance - 0.2, bearing])
-        elif agent.state.p_pos[1] <= 3.63:
+            prox = self.get_closest_indice(bearing)
+            for plus in range(prox, len(proximity_sensors)):
+                new_bearing = proximity_sensors[plus]
+                inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), 0, 4, 1, 4)
+                if inter is None:
+                    break
+                else:
+                    distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                    if distance <= 0.37:
+                        obs_pos.append([distance-0.2, new_bearing])
+                    else:
+                        break
+            if prox > 0:
+                for plus in range(prox - 1, -1, -1):
+                    new_bearing = proximity_sensors[plus]
+                    inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), 0, 4, 1, 4)
+                    if inter is None:
+                        break
+                    else:
+                        distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                        if distance <= 0.37:
+                            obs_pos.append([distance-0.2, new_bearing])
+                        else:
+                            break
+        elif agent.state.p_pos[1] <= -3.63:
             distance = 4 + agent.state.p_pos[1]
             dist = [0, -4 - agent.state.p_pos[1]]
             if world.use_directions:
@@ -246,7 +367,30 @@ class Scenario(BaseScenario):
                 dist[0] = (np.cos(agent.direction)*old_distance[0] - np.sin(agent.direction)*old_distance[1])[0]
                 dist[1] = (np.sin(agent.direction)*old_distance[0] + np.cos(agent.direction)*old_distance[1])[0]
             bearing = np.arctan2(dist[0], dist[1])
-            obs_pos.append([distance - 0.2, bearing])
+            prox = self.get_closest_indice(bearing)
+            for plus in range(prox, len(proximity_sensors)):
+                new_bearing = proximity_sensors[plus]
+                inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), 0, -4, 1, -4)
+                if inter is None:
+                    break
+                else:
+                    distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                    if distance <= 0.37:
+                        obs_pos.append([distance-0.2, new_bearing])
+                    else:
+                        break
+            if prox > 0:
+                for plus in range(prox - 1, -1, -1):
+                    new_bearing = proximity_sensors[plus]
+                    inter = self.intersection_droites(0, 0, sin(new_bearing), cos(new_bearing), 0, -4, 1, -4)
+                    if inter is None:
+                        break
+                    else:
+                        distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
+                        if distance <= 0.37:
+                            obs_pos.append([distance-0.2, new_bearing])
+                        else:
+                            break
         obs_pos = np.array(obs_pos)
         observations = np.empty([3], dtype=object)
         if agent.action.u is None:
