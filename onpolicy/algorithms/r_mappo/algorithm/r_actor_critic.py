@@ -48,7 +48,7 @@ class R_Actor(nn.Module):
         self.tpdv = dict(dtype=torch.float32, device=device)
         self.device = device
         self.global_obs = False
-        if "global" in args.experiment_name:
+        if "global" in args.experiment_name and "obs" in args.experiment_name:
             self.global_obs = True
 
         obs_shape = get_shape_from_obs_space(obs_space)
@@ -86,13 +86,11 @@ class R_Actor(nn.Module):
         else:
             original_actor = False
         for i in range(len(obs[0])):
-            #if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
-                #print(i)
-                #indice_grid = int(obs[0][i][0])
-                #obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
-            #else:
-            if "obs" in self.experiment_name and "global" in self.experiment_name and i == 3:
+            if "obs" in self.experiment_name and "global" in self.experiment_name and i == 3 and "attention" in self.experiment_name:
                 obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor, global_obs=self.global_obs, nb_features=4)
+            elif len(obs[0][i].shape) == 1 and not self.padding and i!=0 and i!=1:
+                indice_grid = int(obs[0][i][0])
+                obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
             else:
                 obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor, global_obs=self.global_obs)
             list_obs.append(obs_to_add)
@@ -102,7 +100,6 @@ class R_Actor(nn.Module):
         masks, _ = check(masks, self.grid_size, self.device)
         if available_actions is not None:
             available_actions, _ = check(available_actions, self.grid_size, self.device)
-
         actor_features = self.base(list_obs, mask=list_padding)
         if memory:
             self.list_obs = list_obs
@@ -137,11 +134,11 @@ class R_Actor(nn.Module):
         else:
             original_actor = False
         for i in range(len(obs[0])):
-            #if  len(obs[0][i].shape) == 1 and i != 0 and i != 4 and not self.padding:
-                #indice_grid = int(obs[0][i][0])
-                #obs_to_add, padding_to_add = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
-            #else:
-            obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor, global_obs=self.global_obs)
+            if len(obs[0][i].shape) == 1 and not self.padding and i!=0 and i!=1:
+                indice_grid = int(obs[0][i][0])
+                obs_to_add, _ = check([sparse_tensor[indice_grid] for sparse_tensor in obs], self.grid_size, self. device, [sparse_tensor[i][1:] for sparse_tensor in obs])
+            else:
+                obs_to_add, padding_to_add = check([sparse_tensor[i] for sparse_tensor in obs], self.grid_size, self.device, padding=self.padding, nonomniscient=original_actor, global_obs=self.global_obs)
             list_obs.append(obs_to_add)
             if padding_to_add is not None:
                 list_padding.append(padding_to_add)
