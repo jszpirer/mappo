@@ -286,7 +286,8 @@ class MergedModel(nn.Module):
                 else:
                     self.cnn1 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), flattened_size, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=1)
                     if self.num_obstacles != 0:
-                        self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel)
+                        self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=3)
+                        self.dim_actor = 6
               
        self.nb_additional_data = mlp_args.nb_additional_data
        
@@ -353,12 +354,14 @@ class MergedModel(nn.Module):
                         x1 = self.cnn1([x[i*self.dim_actor + 1]])
                         x_inter = cat((velocity, x1), dim=1)
             else:
-                if self.critic and self.omniscient_critic and self.num_obstacles != 0 and self.attention_critic:
-                        if self.attention_critic:
-                            x1 = self.attn([x[0]])
-                            if self.num_obstacles != 0:
-                                x2 = self.attn_obs([x[1]])
-                                x_inter = cat((x1, x2), dim=1)
+                if self.critic and self.omniscient_critic and self.num_obstacles != 0:
+                    if self.attention_critic:
+                        x1 = self.attn([x[0]])
+                        x2 = self.attn_obs([x[1]])
+                    else:
+                        x1 = self.cnn1(x[:3])
+                        x2 = self.cnn2([x[3]])
+                    x_inter = cat((x1, x2), dim=1)
                 elif self.critic and not self.attention_critic:
                     x1 = self.cnn1(x[:3])
                     if self.num_obstacles != 0:
@@ -379,7 +382,7 @@ class MergedModel(nn.Module):
                     else:
                         x1 = self.cnn1([x[i*self.dim_actor + 2]])
                         if self.num_obstacles != 0:
-                            x2 = self.cnn2([x[i*self.dim_actor + 3]])
+                            x2 = self.cnn2(x[i*self.dim_actor + 3:i*self.dim_actor + 6])
                             x_inter = cat((velocity, position, x1, x2), dim=1)
                         else:
                             x_inter = cat((velocity, position, x1), dim=1)

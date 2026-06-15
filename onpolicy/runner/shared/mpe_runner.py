@@ -326,7 +326,7 @@ class MPERunner(Runner):
             print("score is:" + str(score))
  
         if self.all_args.save_gifs:
-            imageio.mimsave(str(self.gif_dir) + '/render.gif', all_frames, duration=self.all_args.ifi)
+            imageio.mimsave(str(self.gif_dir) + '/render.gif', all_frames, fps=20)
         if self.all_args.heatmap:
             envs.save_occupancy()
  
