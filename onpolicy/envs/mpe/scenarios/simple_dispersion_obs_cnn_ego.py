@@ -2,9 +2,10 @@ import numpy as np
 from onpolicy.envs.mpe.core import World, Agent, Landmark, Wall, Entity
 from onpolicy.envs.mpe.scenario import BaseScenario
 import random
-from math import sin, cos, sqrt
+from math import sin, cos, sqrt, ceil
 
 proximity_sensors = [-2.6179, -1.5708, -0.785398, -0.261799, 0.261799, 0.785398, 1.5708, 2.6179]
+nb_prox = 8
 
 class Scenario(BaseScenario):
     def make_world(self, args):
@@ -15,6 +16,8 @@ class Scenario(BaseScenario):
         world.limit = 3.75
         world.num_agents = args.num_agents
         world.num_obstacles = args.num_obstacles
+        print("Num obstacles")
+        print(world.num_obstacles)
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.nb_additional_data = args.nb_additional_data
@@ -103,9 +106,9 @@ class Scenario(BaseScenario):
             if a is agent:
                 continue
             dists.append(np.sqrt(np.sum(np.square(a.state.p_pos - agent.state.p_pos))))
-        rew = -max(dists)
+        rew = min(dists)
         return rew
-
+    
     def get_closest_indice(self, bearing):
         return min(range(len(proximity_sensors)), key=lambda i: abs(proximity_sensors[i] - bearing))
 
@@ -136,18 +139,17 @@ class Scenario(BaseScenario):
             p2 = [x0 + t2 * dx, y0 + t2 * dy]
 
             return [p1, p2]
-
     def intersection_droites(self, x1, y1, dx1, dy1, x2, y2, dx2, dy2):
         D = dx1 * dy2 - dy1 * dx2
-    
+
         if D == 0:
             return None  # parallèles ou confondues
-    
+
         t = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / D
-    
+
         x = x1 + t * dx1
         y = y1 + t * dy1
-    
+
         return [x, y]
 
     def observation(self, agent, world):
@@ -406,26 +408,32 @@ class Scenario(BaseScenario):
         return observations
     
     def critic_observation(self, world):
-        if not self.velocities_critic:
-            agents_pos = np.zeros((world.num_agents, 2))
-            for i, a in enumerate(world.agents):
-                agents_pos[i][0] = a.state.p_pos[0]
-                agents_pos[i][1] = a.state.p_pos[1]
-            observations = np.empty([1], dtype=object)
-            observations[:] = [agents_pos]
-        else:
-            agents = np.zeros((world.num_agents, 4))
-            for i, a in enumerate(world.agents):
-                agents[i][0] = a.state.p_pos[0]
-                agents[i][1] = a.state.p_pos[1]
-                agents[i][2] = a.state.p_vel[0]
-                agents[i][3] = a.state.p_vel[1]
-            observations = np.empty([1], dtype=object)
-        obs_pos = np.zeros((world.num_obstacles, 2))
-        for i, a in enumerate(world.obstacles):
-            obs_pos[i][0] = a.state.p_pos[0]
-            obs_pos[i][1] = a.state.p_pos[1]
-        observations = np.empty([2], dtype=object)
-        observations[:] = [agents, obs_pos]
+        # Critic's observations are the same not matter which robot is used
+        # For velocities, need to know in which liste the indices of the grid are
+        coef = int(ceil(world.grid_resolution/2)/(world.limit*2))
+        scale = int((ceil(world.grid_resolution/2)//2)) - 1
+        agents_vel_x = np.zeros((world.num_agents + 1))
+        agents_vel_x[0] = 2
+        agents_vel_y = np.zeros((world.num_agents + 1))
+        agents_vel_y[0] = 2
+        other_pos = np.zeros((2, world.num_agents))
+        i = 0
+        for other in world.agents:
+            agents_vel_x[i + 1] = other.state.p_vel[0]
+            agents_vel_y[i + 1] = other.state.p_vel[1]
+            distance = other.state.p_pos
+            other_pos[0][i] = round(coef*distance[0]) + scale
+            other_pos[1][i] = round(coef*distance[1]) + scale
+            i += 1
+        obs_pos = np.zeros((2, world.num_obstacles))
+        i = 0
+        for obs in world.obstacles:
+            distance = obs.state.p_pos
+            obs_pos[0][i] = round(coef*distance[0]) + scale
+            obs_pos[1][i] = round(coef*distance[1]) + scale
+            i += 1
+        observations = np.empty([4], dtype=object)
+        observations[:] = [agents_vel_x, agents_vel_y, other_pos, obs_pos]
         return observations
+
 

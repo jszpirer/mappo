@@ -2,9 +2,10 @@ import numpy as np
 from onpolicy.envs.mpe.core import World, Agent, Landmark, Wall, Entity
 from onpolicy.envs.mpe.scenario import BaseScenario
 import random
-from math import sin, cos, sqrt
+from math import sin, cos, sqrt, ceil
 
 proximity_sensors = [-2.6179, -1.5708, -0.785398, -0.261799, 0.261799, 0.785398, 1.5708, 2.6179]
+nb_prox = 8
 
 class Scenario(BaseScenario):
     def make_world(self, args):
@@ -15,6 +16,8 @@ class Scenario(BaseScenario):
         world.limit = 3.75
         world.num_agents = args.num_agents
         world.num_obstacles = args.num_obstacles
+        print("Num obstacles")
+        print(world.num_obstacles)
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.nb_additional_data = args.nb_additional_data
@@ -105,7 +108,7 @@ class Scenario(BaseScenario):
             dists.append(np.sqrt(np.sum(np.square(a.state.p_pos - agent.state.p_pos))))
         rew = -max(dists)
         return rew
-
+    
     def get_closest_indice(self, bearing):
         return min(range(len(proximity_sensors)), key=lambda i: abs(proximity_sensors[i] - bearing))
 
@@ -136,23 +139,24 @@ class Scenario(BaseScenario):
             p2 = [x0 + t2 * dx, y0 + t2 * dy]
 
             return [p1, p2]
-
     def intersection_droites(self, x1, y1, dx1, dy1, x2, y2, dx2, dy2):
         D = dx1 * dy2 - dy1 * dx2
-    
+
         if D == 0:
             return None  # parallèles ou confondues
-    
+
         t = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / D
-    
+
         x = x1 + t * dx1
         y = y1 + t * dy1
-    
+
         return [x, y]
 
     def observation(self, agent, world):
+        coef = int(ceil(world.grid_resolution/2)/(world.limit*2))
+        scale = int((ceil(world.grid_resolution/2)//2)) - 1
         obs_pos = []
-        other_pos = np.zeros((world.num_agents - 1, 2))
+        other_pos = np.zeros((2, world.num_agents - 1))
         i = 0
         j = 0
         for other in world.agents:
@@ -166,8 +170,8 @@ class Scenario(BaseScenario):
                     dist[0] = (np.cos(agent.direction)*old_distance[0] - np.sin(agent.direction)*old_distance[1])[0]
                     dist[1] = (np.sin(agent.direction)*old_distance[0] + np.cos(agent.direction)*old_distance[1])[0]
                 bearing = np.arctan2(dist[0], dist[1])
-                other_pos[i][0] = distance
-                other_pos[i][1] = bearing
+                other_pos[0][i] = round(coef*dist[0]) + scale
+                other_pos[1][i] = round(coef*dist[1]) + scale
                 if distance <= 0.47:
                     prox = self.get_closest_indice(bearing)
                     for k in range(0, nb_prox):
@@ -179,15 +183,16 @@ class Scenario(BaseScenario):
                         elif len(inter) == 1:
                             distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             if distance <= 0.32:
-                                obs_pos.append([distance-0.15, new_bearing])
+                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
                             else:
                                 break
                         else:
                             distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
-                            distance = min(distance_1, distance_2)
-                            if distance <= 0.32:
-                                obs_pos.append([distance-0.15, new_bearing])
+                            if distance_1 <= 0.32 and distance_2 >= distance_1:
+                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                            elif distance <= 0.32:
+                                obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
                             else:
                                 break
                     for k in range(1, nb_prox):
@@ -199,22 +204,23 @@ class Scenario(BaseScenario):
                         elif len(inter) == 1:
                             distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             if distance <= 0.32:
-                                obs_pos.append([distance-0.15, new_bearing])
+                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
                             else:
                                 break
                         else:
                             distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
-                            distance = min(distance_1, distance_2)
-                            if distance <= 0.32:
-                                obs_pos.append([distance-0.15, new_bearing])
+                            if distance_1 <= 0.32 and distance_2 >= distance_1:
+                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                            elif distance <= 0.32:
+                                obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
                             else:
                                 break
                 i += 1
             else:
                 j += 1
         if j > 0:
-            other_pos = other_pos[:-j, :]
+            other_pos = other_pos[:, :-j]
         for obs in world.obstacles:
             distance = np.linalg.norm(obs.state.p_pos - agent.state.p_pos)
             if distance <= 0.82:
@@ -234,15 +240,16 @@ class Scenario(BaseScenario):
                     elif len(inter) == 1:
                         distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         if distance <= 0.32:
-                            obs_pos.append([distance-0.15, new_bearing])
+                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
                         else:
                             break
                     else:
                         distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
-                        distance = min(distance_1, distance_2)
-                        if distance <= 0.32:
-                            obs_pos.append([distance-0.15, new_bearing])
+                        if distance_1 <= 0.32 and distance_2 >= distance_1:
+                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                        elif distance <= 0.32:
+                            obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
                         else:
                             break
                 for k in range(1, nb_prox):
@@ -254,15 +261,16 @@ class Scenario(BaseScenario):
                     elif len(inter) == 1:
                         distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         if distance <= 0.32:
-                            obs_pos.append([distance-0.15, new_bearing])
+                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
                         else:
                             break
                     else:
                         distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
-                        distance = min(distance_1, distance_2)
-                        if distance <= 0.32:
-                            obs_pos.append([distance-0.15, new_bearing])
+                        if distance_1 <= 0.32 and distance_2 >= distance_1:
+                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                        elif distance <= 0.32:
+                            obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
                         else:
                             break
         if agent.state.p_pos[0] >= 3.63:
@@ -283,7 +291,9 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
                     else:
                         break
             for k in range(1, nb_prox):
@@ -295,7 +305,9 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
                     else:
                         break
         elif agent.state.p_pos[0] <= -3.63:
@@ -316,7 +328,9 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
                     else:
                         break
             for k in range(1, nb_prox):
@@ -328,7 +342,9 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
                     else:
                         break
         if agent.state.p_pos[1] >= 3.63:
@@ -349,7 +365,9 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
                     else:
                         break
             for k in range(1, nb_prox):
@@ -361,7 +379,9 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
                     else:
                         break
         elif agent.state.p_pos[1] <= -3.63:
@@ -397,7 +417,13 @@ class Scenario(BaseScenario):
                         obs_pos.append([distance-0.2, new_bearing])
                     else:
                         break
-        obs_pos = np.array(obs_pos)
+        print("Dans le scenario pour tester")
+        print(obs_pos)
+        if len(obs_pos) == 0:
+            obs_pos = np.empty((2,0))
+        else:
+            obs_pos = np.array(obs_pos).T
+        print(obs_pos)
         observations = np.empty([3], dtype=object)
         if agent.action.u is None:
             observations[:] = [np.zeros(2), other_pos, obs_pos]
@@ -406,26 +432,32 @@ class Scenario(BaseScenario):
         return observations
     
     def critic_observation(self, world):
-        if not self.velocities_critic:
-            agents_pos = np.zeros((world.num_agents, 2))
-            for i, a in enumerate(world.agents):
-                agents_pos[i][0] = a.state.p_pos[0]
-                agents_pos[i][1] = a.state.p_pos[1]
-            observations = np.empty([1], dtype=object)
-            observations[:] = [agents_pos]
-        else:
-            agents = np.zeros((world.num_agents, 4))
-            for i, a in enumerate(world.agents):
-                agents[i][0] = a.state.p_pos[0]
-                agents[i][1] = a.state.p_pos[1]
-                agents[i][2] = a.state.p_vel[0]
-                agents[i][3] = a.state.p_vel[1]
-            observations = np.empty([1], dtype=object)
-        obs_pos = np.zeros((world.num_obstacles, 2))
-        for i, a in enumerate(world.obstacles):
-            obs_pos[i][0] = a.state.p_pos[0]
-            obs_pos[i][1] = a.state.p_pos[1]
-        observations = np.empty([2], dtype=object)
-        observations[:] = [agents, obs_pos]
+        # Critic's observations are the same not matter which robot is used
+        # For velocities, need to know in which liste the indices of the grid are
+        coef = int(ceil(world.grid_resolution/2)/(world.limit*2))
+        scale = int((ceil(world.grid_resolution/2)//2)) - 1
+        agents_vel_x = np.zeros((world.num_agents + 1))
+        agents_vel_x[0] = 2
+        agents_vel_y = np.zeros((world.num_agents + 1))
+        agents_vel_y[0] = 2
+        other_pos = np.zeros((2, world.num_agents))
+        i = 0
+        for other in world.agents:
+            agents_vel_x[i + 1] = other.state.p_vel[0]
+            agents_vel_y[i + 1] = other.state.p_vel[1]
+            distance = other.state.p_pos
+            other_pos[0][i] = round(coef*distance[0]) + scale
+            other_pos[1][i] = round(coef*distance[1]) + scale
+            i += 1
+        obs_pos = np.zeros((2, world.num_obstacles))
+        i = 0
+        for obs in world.obstacles:
+            distance = obs.state.p_pos
+            obs_pos[0][i] = round(coef*distance[0]) + scale
+            obs_pos[1][i] = round(coef*distance[1]) + scale
+            i += 1
+        observations = np.empty([4], dtype=object)
+        observations[:] = [agents_vel_x, agents_vel_y, other_pos, obs_pos]
         return observations
+
 
