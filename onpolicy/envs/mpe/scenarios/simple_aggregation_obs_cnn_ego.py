@@ -16,8 +16,6 @@ class Scenario(BaseScenario):
         world.limit = 3.75
         world.num_agents = args.num_agents
         world.num_obstacles = args.num_obstacles
-        print("Num obstacles")
-        print(world.num_obstacles)
         world.collaborative = True
         world.grid_resolution = args.grid_resolution
         world.nb_additional_data = args.nb_additional_data
@@ -183,16 +181,22 @@ class Scenario(BaseScenario):
                         elif len(inter) == 1:
                             distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             if distance <= 0.32:
-                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                                new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                                if new_point not in obs_pos:
+                                    obs_pos.append(new_point)
                             else:
                                 break
                         else:
                             distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
                             if distance_1 <= 0.32 and distance_2 >= distance_1:
-                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                                new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                                if new_point not in obs_pos:
+                                    obs_pos.append(new_point)
                             elif distance <= 0.32:
-                                obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
+                                new_point = [round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale]
+                                if new_point not in obs_pos:
+                                    obs_pos.append(new_point)
                             else:
                                 break
                     for k in range(1, nb_prox):
@@ -204,16 +208,22 @@ class Scenario(BaseScenario):
                         elif len(inter) == 1:
                             distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             if distance <= 0.32:
-                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                                new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                                if new_point not in obs_pos:
+                                    obs_pos.append(new_point)
                             else:
                                 break
                         else:
                             distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                             distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
                             if distance_1 <= 0.32 and distance_2 >= distance_1:
-                                obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                                new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                                if new_point not in obs_pos:
+                                    obs_pos.append(new_point)
                             elif distance <= 0.32:
-                                obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
+                                new_point = [round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale]
+                                if new_point not in obs_pos:
+                                    obs_pos.append(new_point)
                             else:
                                 break
                 i += 1
@@ -240,16 +250,22 @@ class Scenario(BaseScenario):
                     elif len(inter) == 1:
                         distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         if distance <= 0.32:
-                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                            new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                            if new_point not in obs_pos:
+                                obs_pos.append(new_point)
                         else:
                             break
                     else:
                         distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
                         if distance_1 <= 0.32 and distance_2 >= distance_1:
-                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                            new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                            if new_point not in obs_pos:
+                                obs_pos.append(new_point)
                         elif distance <= 0.32:
-                            obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
+                            new_point = [round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale]
+                            if new_point not in obs_pos:
+                                obs_pos.append(new_point)
                         else:
                             break
                 for k in range(1, nb_prox):
@@ -261,16 +277,22 @@ class Scenario(BaseScenario):
                     elif len(inter) == 1:
                         distance = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         if distance <= 0.32:
-                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                            new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                            if new_point not in obs_pos:
+                                obs_pos.append(new_point)
                         else:
                             break
                     else:
                         distance_1 = sqrt(pow(inter[0][0], 2) + pow(inter[0][1], 2))
                         distance_2 = sqrt(pow(inter[1][0], 2) + pow(inter[1][1], 2))
                         if distance_1 <= 0.32 and distance_2 >= distance_1:
-                            obs_pos.append([round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale])
+                            new_point = [round(coef*(inter[0][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[0][1] - cos(new_bearing) * 0.15)) + scale]
+                            if new_point not in obs_pos:
+                                obs_pos.append(new_point)
                         elif distance <= 0.32:
-                            obs_pos.append([round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale])
+                            new_point = [round(coef*(inter[1][0] - sin(new_bearing) * 0.15)) + scale, round(coef*(inter[1][1] - cos(new_bearing) * 0.15)) + scale]
+                            if new_point not in obs_pos:
+                                obs_pos.append(new_point)
                         else:
                             break
         if agent.state.p_pos[0] >= 3.63:
@@ -293,7 +315,9 @@ class Scenario(BaseScenario):
                     if distance <= 0.37:
                         a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
                         b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
-                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
             for k in range(1, nb_prox):
@@ -307,7 +331,9 @@ class Scenario(BaseScenario):
                     if distance <= 0.37:
                         a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
                         b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
-                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
         elif agent.state.p_pos[0] <= -3.63:
@@ -330,7 +356,9 @@ class Scenario(BaseScenario):
                     if distance <= 0.37:
                         a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
                         b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
-                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
             for k in range(1, nb_prox):
@@ -344,7 +372,9 @@ class Scenario(BaseScenario):
                     if distance <= 0.37:
                         a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
                         b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
-                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
         if agent.state.p_pos[1] >= 3.63:
@@ -367,7 +397,9 @@ class Scenario(BaseScenario):
                     if distance <= 0.37:
                         a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
                         b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
-                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
             for k in range(1, nb_prox):
@@ -381,7 +413,9 @@ class Scenario(BaseScenario):
                     if distance <= 0.37:
                         a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
                         b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
-                        obs_pos.append([round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)])
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
         elif agent.state.p_pos[1] <= -3.63:
@@ -402,7 +436,11 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
             for k in range(1, nb_prox):
@@ -414,16 +452,17 @@ class Scenario(BaseScenario):
                 else:
                     distance = sqrt(pow(inter[0], 2) + pow(inter[1], 2))
                     if distance <= 0.37:
-                        obs_pos.append([distance-0.2, new_bearing])
+                        a_prime = [sin(new_bearing) * 0.15, cos(new_bearing) * 0.15]
+                        b_prime = [inter[0] - sin(new_bearing) * 0.05, inter[1] - cos(new_bearing) * 0.05]
+                        new_point = [round(coef*(b_prime[0] - a_prime[0]) + scale), round(coef*(b_prime[1] - a_prime[1]) + scale)]
+                        if new_point not in obs_pos:
+                            obs_pos.append(new_point)
                     else:
                         break
-        print("Dans le scenario pour tester")
-        print(obs_pos)
         if len(obs_pos) == 0:
             obs_pos = np.empty((2,0))
         else:
             obs_pos = np.array(obs_pos).T
-        print(obs_pos)
         observations = np.empty([3], dtype=object)
         if agent.action.u is None:
             observations[:] = [np.zeros(2), other_pos, obs_pos]

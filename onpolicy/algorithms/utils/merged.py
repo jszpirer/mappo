@@ -288,10 +288,11 @@ class MergedModel(nn.Module):
                     if self.num_obstacles != 0:
                         if "global" in self.experiment_name:
                             channels = 3
+                            self.dim_actor = 6
                         else:
                             channels = 1
+                            self.dim_actor = 3
                         self.cnn2 = SimplSparseSpreadCNN((mlp_args.grid_resolution, mlp_args.grid_resolution), 12, mlp_args.use_orthogonal, mlp_args.use_ReLU, stride=mlp_args.stride, kernel_size=mlp_args.kernel, input_channels=channels)
-                        self.dim_actor = 6
               
        self.nb_additional_data = mlp_args.nb_additional_data
        
@@ -308,16 +309,13 @@ class MergedModel(nn.Module):
         x_inter_list = []
         for i in range(len(x)//(self.dim_actor)):
             if "local" in self.experiment_name:
-                print("Local in experiment")
                 if self.critic and self.omniscient_critic and "rvr" in self.experiment_name:
                     x1 = self.cnn1(x[:3])
                     x2 = self.cnn2([x[3]])
                     x_inter = cat((x1, x2), dim=1)
                     #x_inter = x1
                 elif "coverage" in self.experiment_name:
-                    print("Coverage in experiment")
                     if self.critic and self.omniscient_critic:
-                        print("critic and omnciscient")
                         if self.attention_critic:
                             x1 = self.attn([x[0]])
                             if self.num_obstacles != 0:
@@ -340,7 +338,6 @@ class MergedModel(nn.Module):
                         positions = x[i*self.dim_actor + 1].reshape(x[i*self.dim_actor + 1].size(0), x[i*self.dim_actor + 1].size(1) * x[i*self.dim_actor + 1].size(2))
                         x_inter = cat((action, positions), dim=1)
                     else:
-                        print("actor")
                         velocity = x[i*self.dim_actor + 0]
                         if self.attention_actor:
                             if "global" in self.experiment_name:
@@ -362,7 +359,6 @@ class MergedModel(nn.Module):
                             else:
                                 x_inter = cat((velocity, x1), dim=1)
                 else:
-                    print("else")
                     velocity = x[i*self.dim_actor + 0]
                     if "rvr" in self.experiment_name:
                         x1 = self.cnn1(x[1:4])
